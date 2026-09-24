@@ -262,6 +262,24 @@ file
 
 Use only a demonstrated alternative for the task at hand. Do not replace one unavailable command with another familiar utility unless that utility is separately established.
 
+## Unestablished commands: do not assume
+
+The following commands are not established as available in the current Tomi runtime and must not be used in generated Tomi instructions unless separately verified:
+
+```text
+readlink
+stat
+sort
+uniq
+xargs
+hexdump
+od
+realpath
+command -v
+```
+
+This category is deliberately different from the proven-unavailable list above. Lack of current proof is not proof of absence. An earlier USB-mode report found `readlink` unavailable in both stated BusyBox locations, but current standalone command resolution was not captured.
+
 ## Known option and behavior constraints
 
 - `head -n 1` works; `head -1` does not.
@@ -269,7 +287,7 @@ Use only a demonstrated alternative for the task at hand. Do not replace one una
 - Do not assume GNU-only flags or that every common BusyBox option is enabled.
 - Plain `grep` is available. The 2026-09-24 capture does not establish `grep -E`, `grep -A`, or `grep -B`; avoid those forms unless separately verified.
 - `sleep` is present. Fractional-second support is not established; do not assume it.
-- Neither current BusyBox applet list contains `readlink`. An earlier USB-mode report also says it was unavailable in both stated BusyBox locations, but current standalone command resolution was not captured; do not rely on it without checking.
+- `ls -ld` was observed working in the current live session. Other `ls` option combinations remain subject to the general conservative-options rule.
 - The current capture lists `printf` neither as a BusyBox applet nor as a separately confirmed shell builtin. A prior exact-image test found no `printf` applet or builtin in that tested V003 image. Avoid `printf` in portable Tomi instructions unless the live shell has been checked.
 - `cat` is in both captured BusyBox applet lists. A past smoke procedure preferred `while IFS= read -r` for a particular file-display workflow; that was a conservative choice, not evidence that `cat` is absent.
 
@@ -281,11 +299,19 @@ Use the explicit expanded multicall binary for SHA-256:
 /mnt/sdcard/opentom/extra/bin/busybox sha256sum FILE
 ```
 
-The expanded build also provides `md5sum`. Its options beyond ordinary file hashing are not established here. Do not use `sha256sum -c`; the captured expanded BusyBox does not support that option. A standalone wrapper at `/mnt/sdcard/opentom/extra/bin/sha256sum` was reported as possibly present; prefer the explicit BusyBox invocation so the provider is clear.
+The expanded build also provides `md5sum`. Its options beyond ordinary file hashing are not established here. Do not use `sha256sum -c`; the captured expanded BusyBox does not support that option.
+
+An established wrapper is also available at:
+
+```text
+/mnt/sdcard/opentom/extra/bin/sha256sum
+```
+
+The explicit BusyBox invocation remains preferred in canonical instructions because it makes the provider unambiguous.
 
 ## Timing helpers
 
-BusyBox `sleep` is present. Do not assume fractional sleeps. A separate executable named `tomi-usleep` was installed at `/mnt/sdcard/opentom/tomi-usleep` and successfully invoked in a 2026-08-23 terminal session. Its current presence and behavior were not established by the 2026-09-24 capture, so check it before use.
+BusyBox `sleep` is present. Do not assume fractional sleeps. A separate executable named `tomi-usleep` was installed at `/mnt/sdcard/opentom/tomi-usleep` and successfully invoked in a 2026-08-23 terminal session. Its current presence and behavior were not established by the 2026-09-24 capability capture, so reverify it if the runtime or image has materially changed before depending on it.
 
 ## Standalone OpenTom utilities
 
@@ -307,8 +333,9 @@ When writing Tomi-side commands:
 1. Select a command from the captured stock or expanded inventory, or cite separate evidence for a standalone utility.
 2. Use an explicitly demonstrated option form; otherwise keep arguments plain and minimal.
 3. Use the expanded BusyBox path when calling `sha256sum`, `md5sum`, or an expanded-only applet.
-4. Avoid the unavailable commands listed above, `head -1`, `sha256sum -c`, unverified grep context/extended options, and fractional sleep assumptions.
-5. Keep current runtime facts distinct from image-specific historical tests and older terminal sessions.
+4. Avoid the unavailable commands listed above, and do not assume commands in the unestablished list without separate proof.
+5. Avoid `head -1`, `sha256sum -c`, unverified grep context/extended options, and fractional sleep assumptions.
+6. Keep current runtime facts distinct from image-specific historical tests and older terminal sessions.
 
 ## Related runbooks
 
