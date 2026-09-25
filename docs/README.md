@@ -37,4 +37,4 @@ When material genuinely spans buckets, put the authoritative detail where it fit
 
 ## Migration rule
 
-Legacy documents are source material, not automatically canonical truth. During bootstrap they should be reconciled, with claims classified as current/supported, historical only, superseded, duplicate, contradictory, or unresolved. Only the adjudicated living result belongs here.
+Legacy documents are source material, not automatically canonical truth. Before material from them is adopted, reconcile its claims as current/supported, historical only, superseded, duplicate, contradictory, or unresolved. Only the adjudicated living result belongs here.

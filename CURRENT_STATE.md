@@ -15,7 +15,7 @@ The primary device is TT3 “Tomi,” with TomiDock providing its current USB/ne
 
 ### PowerFlight
 
-PowerFlight v001.5.3 has a formal run with a verified 6/6-file manifest and no `BLOCKED` events. Its final recorded state was `VBUS=0`, `CHARGE=0`, `CHILD=1`, `USB_STATE_HOST`, `last_error=0x0`, `BATTERY_RETURN_CHILD_ATTACHED`. This is a validated observation, not a universal charging or electrical guarantee.
+A preserved PowerFlight v001.5.3 run archive has six payloads verified against its embedded manifest and no `BLOCKED` events; its Tomi-specific records strongly support a physical Tomi run, but the acquisition path and exact recorder bytes are not bound. Its final recorded state was `VBUS=0`, `CHARGE=0`, `CHILD=1`, `USB_STATE_HOST`, `last_error=0x0`, `BATTERY_RETURN_CHILD_ATTACHED`. This is an archive observation, not a universal charging or electrical guarantee. See the [power/battery reference](docs/reference/tomi-power-battery.md) for provenance limits.
 
 ### nxbattery
 

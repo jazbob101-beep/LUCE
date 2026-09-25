@@ -24,7 +24,7 @@ A current Git conclusion should point back to the strongest underlying evidence 
 - copy huge captures or firmware into Git merely for convenience;
 - duplicate the same evidence package across multiple storage systems without a reason;
 - call normalized/reformatted material byte-verbatim evidence;
-- treat absence from this index as proof that evidence does not exist during bootstrap.
+- treat absence from this selected index as proof that evidence does not exist.
 
 ## TT3 identity and firmware
 
@@ -78,11 +78,11 @@ A current Git conclusion should point back to the strongest underlying evidence 
 |---|---|---|---|
 | OpenTom V002 legacy build validation, 2026-09-02 | **Build validation report** — `/mnt/d/Codex/usbmode-authoritative-state-v002-build-validation-20260902/REPORT.md`; SHA-256 `a3e82c75ef7c8c6bcdacf3a1d9c29a8b0241eb5cbf0b13645b50d8406d9776a2`. | Records a verified MacBook Debian/Bookworm chroot build context and GCC 3.3.4, with supporting logs/artifacts in its work unit. | Historical validation context for [Lab Environment](../docs/environment/lab-environment.md); does not assert that every listed path or checkout remains unchanged today. |
 
-## Evidence gaps noted during bootstrap
+## Evidence gaps
 
 - The 2026-09-24 live BusyBox inventories are preserved in a Codex attachment, but no durable raw capture was found. The inventories in [Tomi Runtime ABI](../docs/reference/tomi-runtime-abi.md) remain operator-provided and are not hash-bound to the live binaries.
 - The successful 2026-09-24 SCP proof is described in the operator brief, but its raw transcript, transferred-file byte count, and digest were not found as a durable artifact. The [Tomi File Transfer runbook](../docs/runbooks/tomi-file-transfer.md) is procedure, not proof of that transfer.
 - The current OpenTom Austin/type-42 source files are present in the working checkout, but were not found as tracked blobs at its recorded `HEAD`; no frozen source snapshot was identified during this pass. They are not indexed as immutable source evidence.
 - Exact installed-byte identities for current nxbattery, `tomidock-netd`, `/etc/rc`, and the ESP image remain unbound in the available deployment records; see [Current State](../CURRENT_STATE.md).
 
-This is a bootstrap selection of high-value evidence for material already migrated into LUCE, not a complete inventory of `/mnt/d/Codex`. Later corpus-coverage work may add evidence for other domains.
+This is a selected set of high-value retrieval anchors for material documented in LUCE, not a complete inventory of `/mnt/d/Codex`. Add or revise anchors when they materially improve retrieval or provenance for current canonical content.

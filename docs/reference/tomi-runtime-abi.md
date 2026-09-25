@@ -339,7 +339,7 @@ When writing Tomi-side commands:
 
 ## Related runbooks
 
-No current LUCE file-transfer runbook is part of this migration. When one is created, it should own the full SCP/SSH procedure and link back here for tool availability and compatibility.
+The [Tomi File Transfer runbook](../runbooks/tomi-file-transfer.md) owns the current SCP/SSH and HTTP-staging procedures; use this reference for command availability and compatibility.
 
 ## Provenance
 

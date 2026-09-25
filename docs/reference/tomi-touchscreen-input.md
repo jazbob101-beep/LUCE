@@ -143,4 +143,4 @@ No origin, axis direction, scaling, or screen-coordinate range should be inferre
 - [Tomi Runtime ABI](tomi-runtime-abi.md) — live target command/tool compatibility.
 - [Tomi Power and Battery](tomi-power-battery.md) — power-button and power semantics.
 - [Tomi Disaster Recovery](../runbooks/tomi-disaster-recovery.md) — raw-GPIO rescue trigger semantics.
-- The external reconciliation report at `/mnt/d/Codex/TT3/luce-bootstrap-tomi-touchscreen-input-reconciliation-2026-09-24.md` inventories investigations, negative results, provenance, and future evidence-index candidates. Raw evidence and tooling remain in their original locations.
+- The external reconciliation report at `/mnt/d/Codex/TT3/luce-bootstrap-tomi-touchscreen-input-reconciliation-2026-09-24.md` inventories investigations, negative results, provenance, and evidence-index candidates considered during that migration. Raw evidence and tooling remain in their original locations.

@@ -52,7 +52,7 @@ Representative tested source patterns use `GrOpen()`, `GrNewWindowEx()` with `GR
 
 nxbattery requests `GR_FONT_SYSTEM_VAR` at 18×18 in its source. That is the application's font request, not a verified physical font file/name or measured glyph metric on Tomi. The inspected Microwindows config enables native FNT/FNTGZ and PCF-GZ support, while FreeType, PCF (uncompressed), and Type 1 support are disabled. Those are source-config observations only; which font assets are installed/loaded by the deployed server and whether fallback occurred are unknown. No Tomi-specific anti-aliasing or font-rendering measurement is preserved.
 
-Startup exports tslib paths (`/dev/input/event0`, `/dev/fb`, a `ts.conf`, plugin directory, and calibration file), and first-light package material contains tslib components. This is evidence of configured input plumbing, not proof of live touch events, calibration quality, Nano-X event delivery, or current production use. Detailed touch hardware/calibration belongs in a separate input investigation.
+Startup exports tslib paths (`/dev/input/event0`, `/dev/fb`, a `ts.conf`, plugin directory, and calibration file), and first-light package material contains tslib components. This is evidence of configured input plumbing, not proof of live touch events, calibration quality, Nano-X event delivery, or current production use. The [touchscreen/input reference](tomi-touchscreen-input.md) owns acquisition and calibration evidence.
 
 ## Rendering, windows, and background behavior
 
@@ -64,7 +64,7 @@ Startup exports tslib paths (`/dev/input/event0`, `/dev/fb`, a `ts.conf`, plugin
 
 ### Clock — both graphics and a separate timekeeping concern
 
-The Tomi telnet capture establishes that `/mnt/sdcard/opentom/thomas/bin/nxdclock` was running beside `nano-X` and `nanowm`. Existing nxbattery documentation gives nxdclock v0.5 layout values, but its own candidate was not bench-validated in that nxbattery work unit. Thus the clock is a **GRAPHICAL_APPLICATION** here only for process coexistence and its reported layout. The clock's displayed time source, RTC synchronization, timezone and boot-time behavior are not owned by this document; migrate those as a separate time/RTC topic. See also [GPS/glgps findings](tomi-gps-glgps.md).
+The Tomi telnet capture establishes that `/mnt/sdcard/opentom/thomas/bin/nxdclock` was running beside `nano-X` and `nanowm`. Existing nxbattery documentation gives nxdclock v0.5 layout values, but its own candidate was not bench-validated in that nxbattery work unit. Thus the clock is a **GRAPHICAL_APPLICATION** here only for process coexistence and its reported layout. The clock's displayed time source, RTC synchronization, timezone and boot-time behavior are owned by the [timekeeping/RTC reference](tomi-timekeeping-rtc.md). See also [GPS/glgps findings](tomi-gps-glgps.md).
 
 The unrelated OpenTom `applications/src/tools/nxclock.c` is an analog Nano-X demo using `gettimeofday()`/`localtime()` and drawing primitives. It is source material, not identified as Tomi's deployed `nxdclock`.
 
