@@ -39,21 +39,29 @@ GPIO4 runtime VBUS/session role:  none
 External GPIO4/BVALID monitor:    not used
 ```
 
-Normal ESP boot, enumeration as `303a:4002`, CDC-ECM, Wi-Fi/routing/NAPT, and TCP/2323 forwarding passed the post-removal smoke test. This closes the question of whether the HIGH jumper is required for normal intended operation; it does not prove deterministic physical-detach fail-close behavior or formal USB electrical compliance.
+Normal ESP boot, enumeration as `303a:4002`, CDC-ECM, Wi-Fi/routing/NAPT, and TCP/2323 forwarding passed the post-removal smoke test. The physical jumper-removal result closes GPIO4 necessity for this current normal topology. It does not prove deterministic physical-detach fail-close behavior, explain historical lifecycle anomalies, or establish formal USB electrical compliance.
 
 ## USB architecture and lifecycle
 
 Tomi operates as the USB host. The ESP32-S3 operates as the native USB CDC-ECM device and has been observed by Tomi as VID:PID `303a:4002`, product string `TomiDock CDC ECM v001`. The intended ESP startup explicitly connects the device after successful TinyUSB driver installation; the no-external-monitor configuration does not consume GPIO4 as BVALID/VBUS input.
 
-The application gates routing eligibility on the USB lifecycle. In the production behavior under review, suspend makes ECM routing unready, which disables forwarding/NAPT and TCP/2323; a valid mount makes routing eligible again. A mount is an application lifecycle event, not by itself proof of a physically present host beyond the USB stack's event semantics.
+The application gates routing eligibility on the USB lifecycle. In the production behavior under review, suspend makes ECM routing unready, which disables forwarding/NAPT and TCP/2323; resume restores eligibility only when TinyUSB is mounted and ready. A MOUNT is an application lifecycle event, not by itself proof of a physically present host. Linux/TinyUSB suspend semantics and the bounded intentional-trigger inventory are owned by [the Tomi USB-role reference](../reference/tomi-usb-role-kernel.md).
 
-Historical observations include one missed application fail-close during a marked physical absence and two apparent premature MOUNT events during reported cable absence. Later instrumented campaigns did not reproduce those phenotypes consistently. They remain unresolved lifecycle robustness observations: deterministic no-GPIO physical-detach fail-close is not proven. They do not establish that GPIO4 is required, and routine detach-cycle hunting is retired. Preserve a future unsolicited anomaly if one occurs, but do not promote these historical observations into current GPIO4 requirements.
+The lifecycle record contains distinct unresolved phenotypes. In the timestamp-correlated Phase 3 A8 cycle, the operator-marked cable-out interval lasted 29.810 seconds; repeated application and routing snapshots remained ready/on throughout it, and the first SUSPEND/disable arrived after cable-in. Separately, two older trials logged SUSPEND/disable followed about 2.657 and 2.578 seconds later by MOUNT/ready while the operator reported the cable still out; a third trial remained suspended until reconnection. Those earlier MOUNTs imply a stack-level reconfiguration path in the audited source but have no raw controller/setup trace identifying its origin. A8 is a missed application fail-close, not a third premature MOUNT.
+
+Phase 4B's B1 and strict B2 blocks had 20/20 clean marked detach/reconnect cycles. The later Phase 4G closely alternated Phase 3 and reduced-observer Phase 4F for eight more clean cycles, with no meaningful A-versus-F outcome difference; this weakened rather than proved an observer-causality hypothesis. The historical observations remain unresolved, and no root cause or universal detach reliability is established. Routine anomaly cycling was retired; preserve a new unsolicited event during otherwise authorized bench work rather than testing for its own sake.
+
+An earlier self-powered ECM source configuration routed GPIO4 through the ESP32-S3 GPIO matrix to DWC2 BVALID and also sampled it in an approximately 80–100 ms application qualifier. A sufficiently long GPIO4-low could end the USB session and remove the D+ attachment while ESP CPU/Wi-Fi stayed alive; a sub-qualifier event could evade the application log. A clean BVALID Session End should clear TinyUSB configuration and unmount, so stale mounted/suspended observations fit better with D+/D-/PHY disturbance while BVALID stayed high or a missed/unprocessed Session End. This is a source-supported mechanism, **not** the cause established for A8 or either premature MOUNT. The adopted no-monitor firmware does not use GPIO4 and uses internal HIGH BVALID; the physical jumper has since been removed. This distinction does not establish USB compliance.
 
 ## Network architecture
 
 The ESP's Wi-Fi interface is the LAN endpoint (`192.168.1.223`); its CDC-ECM interface peers with Tomi on `192.168.77.0/24`. Routing/NAPT provides the tested LAN-to-TomiDock connectivity. A specific inbound mapping exposes ESP LAN TCP/2323 to Tomi `192.168.77.1:23`. This single mapping is the documented inbound service; do not infer that arbitrary Tomi TCP services are transparently reachable from the LAN.
 
-The `.77.2` address is the ESP ECM peer, useful for Tomi-to-ESP traffic; it is not a MacBook/LAN service address. Tomi's stable identity and role-specific details are in [the TT3 device profile](../devices/tt3-tomi.md). Routine network file movement belongs in [the Tomi file-transfer runbook](../runbooks/tomi-file-transfer.md), and command/runtime constraints belong in [the Tomi Runtime ABI](../reference/tomi-runtime-abi.md).
+The `.77.2` address is the ESP ECM peer, useful for Tomi-to-ESP traffic; it is not a MacBook/LAN service address. Bench evidence establishes that routed LAN-to-ECM ICMP succeeded, while direct unsolicited TCP to a proven Tomi listener at `192.168.77.1:2121` timed out. The explicit `192.168.1.223:2323 -> 192.168.77.1:23` mapping continued to work, and Tomi-originated TCP supported a successful active-FTP transfer. The cause of the direct-TCP timeout is open: no firewall, NAPT, lwIP, or firmware cause has been established. The design still exposes the explicit TCP/2323 service; transparent or configurable inbound TCP policy remains a deliberate open question, not a claim that all or no inbound TCP works. File-movement procedures remain in [the Tomi file-transfer runbook](../runbooks/tomi-file-transfer.md); command/runtime constraints belong in [the Tomi Runtime ABI](../reference/tomi-runtime-abi.md).
+
+### Wi-Fi power-save candidate
+
+The audited production source made no explicit `esp_wifi_set_ps()` call and therefore used ESP-IDF 5.5.5's `WIFI_PS_MIN_MODEM` default. A sibling candidate adds a checked `esp_wifi_set_ps(WIFI_PS_NONE)` immediately after Wi-Fi start and one startup result line. It clean-built with ESP-IDF 5.5.5 (application BIN 798,560 bytes, SHA-256 `52f771fb46cdecafc5ccc88475f6e9b628505270069ff6a440e08450730df61d`) but was not flashed or bench-qualified. Reduced ping/TCP latency remains the candidate's design hypothesis, not an observed production improvement; its power and reconnection effects are also unqualified. Do not describe this candidate as current firmware.
 
 ## Tomi-side service integration
 
@@ -66,6 +74,10 @@ echo host > /sys/devices/platform/tomtomgo-usbmode/mode
 ```
 
 Prior use caused rc=139 / kernel Oops behavior. Retain the existing role-aware boot/service path; do not revive a forced-host startup proposal.
+
+### Powered-S3 boot synthesis — historical context only
+
+A source synthesis supports, but does not bench-prove, the remembered logo-hang behavior with an already-powered ESP device attached. In the examined sequential `/etc/rc` path, registering `g_ether` while VBUS is present can block without a timeout waiting for host `SET_CONFIGURATION`; the Tomi role-detection stages themselves are timer-bounded. The current boot path is operator-reported role-aware and already starts `tomidock-netd`, so this is historical startup-design context, not an active boot-host requirement or a proven present failure. Installed `/etc/rc` and kernel bytes are not hash-bound to that live report. The synthesis concerns post-Linux userspace, so the boot-chain document remains unchanged.
 
 ## PowerFlight
 
@@ -99,6 +111,8 @@ Do not equate a source tree, disposable build, or diagnostic image with the curr
 - A8 missed fail-close and two premature-MOUNT reports remain accepted but unresolved; deterministic no-GPIO detach behavior is unproven. Routine anomaly cycling is retired unless a new event or requirement justifies reopening it.
 - Formal USB self-powered compliance and broader electrical/backpower qualification are not established by the functional smoke test.
 - The evidence establishes the explicit TCP/2323 inbound mapping; broader configurable or transparent LAN-to-ECM TCP ingress policy is not established.
+- The built `WIFI_PS_NONE` candidate remains unflashed and has no measured latency benefit; the exact currently installed ESP image is not hash-bound.
+- The powered-S3 `/etc/rc` gadget-wait mechanism is source-supported but not a bench-proven current failure; current role-aware startup is operator-reported.
 
 ## Canonical references
 
@@ -109,4 +123,4 @@ Do not equate a source tree, disposable build, or diagnostic image with the curr
 
 ## Provenance
 
-The current physical/GPIO4 decision and post-removal smoke results are documented in `/mnt/d/Codex/TT3/20_GPIO4_JUMPER_REMOVAL_AND_DESIGN_CLOSEOUT_2026-09-24.md`. Network topology, Tomi-side live service/role-aware boot observations, and programming safety are in `/mnt/d/Codex/TomiDock_Fresh_Thread_Handoff_2026-09-24.md` and the operator-provided 2026-09-24 live-state capture. USB lifecycle findings are summarized in the Phase 4F/4G reports under `/mnt/d/Codex/TT3/tomidock-gpio4-bvalid-audit-20260921/`. The PowerFlight claim points to the hash-identified formal run archive above and `/mnt/d/Codex/TT3/tomi-powerflight-v001.5.3-20260921/REPORT.md`. Detailed source paths and evidence boundaries are recorded in the external reconciliation report for this migration.
+The physical GPIO4 removal and smoke result are recorded in `/mnt/d/Codex/TT3/20_GPIO4_JUMPER_REMOVAL_AND_DESIGN_CLOSEOUT_2026-09-24.md`; lifecycle adjudications are in `/mnt/d/Codex/TT3/tomidock-gpio4-bvalid-audit-20260921/`. The BVALID source audit, Wi-Fi candidate, and powered-S3 synthesis are in their respective `/mnt/d/Codex/TT3/` and `/mnt/d/Codex/PPP-investigation/` work units. The inbound-TCP bench finding and built-only boot-host candidate are in `/mnt/d/Codex/PPP-investigation/tomidock-boot-host-v001/REPORT.md`. Full owner selection and remaining evidence boundaries for this maintenance pass are in `/mnt/d/Codex/TT3/luce-tomidock-usb-lifecycle-coverage-fix-2026-09-25.md`.

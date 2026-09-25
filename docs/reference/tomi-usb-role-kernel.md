@@ -231,6 +231,56 @@ TomTom-specific clocks, pad routing, VBUS sensing, role selection, and PM.
 The exact register bit effects remain controller/tree-specific; no TJ/Atlas
 address or behavior is imported here.
 
+## USB suspend and Linux-side trigger boundary
+
+ESP-side TinyUSB `SUSPEND` is not a Tomi Linux role state and is not, by
+itself, evidence of physical cable removal. In the audited TinyUSB/DWC2 path,
+approximately 3 ms of bus idle invokes the suspend callback while the device
+remains connected and configured; TinyUSB marks it suspended and
+`tud_ready()` becomes false. A resume/wakeup path invokes resume, not MOUNT.
+MOUNT is associated with a nonzero USB `SET_CONFIGURATION` after
+configuration has been cleared. These stack semantics explain event meaning,
+but an application MOUNT log without setup/controller traces does not identify
+the preceding physical or controller event.
+
+The bounded stock-Linux source audit identified several intentional ways the
+Tomi host stack could suspend or be restarted: explicit child-device or
+root-hub runtime-PM writes; system suspend and its unwind; USB role/provider
+teardown and restart; and OHCI root-hub autosuspend when its ports satisfy the
+kernel's suspend/remote-wakeup conditions. An already-connected, nonsuspended
+ECM child vetoes the audited generic OHCI root-hub autosuspend condition.
+Interface-only usbnet runtime PM can stop interface traffic without stopping
+USB Start-of-Frame traffic. The platform OHCI suspend hook examined in the
+source was commented out, although resume code can restart the controller.
+No stock writer to the relevant child, root-hub, or OHCI `power/state` control
+was found in the bounded search; this is not proof that no runtime actor or
+out-of-tree component can trigger the paths. No direct charging or battery
+policy change was identified in these suspend paths. The triggering actor for
+the historical observations remains unknown.
+
+## RUN-2 black-box evidence boundary
+
+The preserved V004 RUN-2 raw archive is SHA-256
+`dae20f7af9f8c08526a7f715182d7f87268b9e88de760fc48d846ede5315722f`.
+Its cumulative dmesg snapshots retain the boot prefix through the final
+snapshot at uptime 311.35 seconds, with no observed truncation or ring
+rollover. Within that captured dmesg interval, the archive contains no
+explicit `authority entry failed` message, logged `last_error` change, or
+additional committed authority transition. This excludes those *logged* events
+only for the covered interval; it cannot exclude a silent/transient fault or
+behavior after the final dmesg snapshot. The 229 polls span uptime 11.12 to
+316.02 seconds and consistently sample IDLE with `usb0` and `g_ether` absent
+and provider modules present. They leave a 4.67-second poll-only tail without
+cumulative dmesg coverage. Polling also cannot prove absence of a transient
+between samples.
+
+The archive does not record a physical event timestamp or VBUS values and
+does not establish successful authority admission. It narrows the explicit
+logged-failure alternative (E) only during dmesg coverage; it does not resolve
+input/producer failure (A) versus queue/reconciliation failure (B). Preserve
+that boundary rather than treating stable sampled state as proof of every
+intermediate transition.
+
 ## Boot initialization and userspace relationship
 
 The generic driver registers as a platform driver; late init performs
@@ -257,7 +307,7 @@ document.
 | Authoritative architecture / V001 | Seven-state enum can express one serialized connector-role contract if UDC/OHCI ownership, entry/revocation, and child observation are coordinated. | V001 patch candidate; initially unbuilt. Design proposal, not live behavior. |
 | V002 | Exact-baseline startup correction; compiled and linked; reconstructed candidate validated offline. | Later operator report: desktop booted, Gadget did not enumerate. Functional USB failure; state result lacked correlated trace. |
 | V003/V004 | Persistent diagnostic logger then exact-shell compatibility correction; USB authority policy unchanged. | Diagnostic candidates, not role fixes. Exact-shell validation found `printf` unavailable as applet/builtin; V004 corrected this. |
-| Rake / RUN-2 | Reconciled seven-state contract and raw black-box archive. Cumulative dmesg excludes explicit logged admission failure and extra authority transitions through retained coverage; input-versus-worker boundary remains open. | Does not prove no silent/transient fault or behavior beyond capture. |
+| Rake / RUN-2 | Reconciled seven-state contract and preserved raw black-box archive (SHA-256 recorded above). Cumulative dmesg contains no explicit logged admission failure, `last_error` change, or additional committed transition through uptime 311.35 s; 229 sampled polls consistently show IDLE/no `usb0`/no `g_ether` through 316.02 s. | Explicit logged-failure exclusion is bounded to dmesg coverage; 4.67 s poll-only tail, no physical event time/VBUS, and sampling limits remain. A input/producer versus B queue/reconciliation remains open. |
 | V005 trace | Correlated raw GPF1, cache/replay, notifier, role input, queue/worker, admission, error and publication points. | Diagnostic; no policy change. Bench trace is bounded by its actual coverage. |
 | V005 RUN-3 root cause / V006 | A registered notifier subscriber was erased by a later `buspower_probe` reset; V006 deletes that reset. | Source plus raw trace confirms this V005 RUN-3 cause. It plausibly explains analogous earlier outcomes but does not prove their cause. V006 is built. |
 | V007 | Productionized V006 repair with tracing removed; V002 role authority and rootfs retained. | Built/static validated and ready for regression; no V007 deployment/runtime claim. |
@@ -316,9 +366,10 @@ surviving findings and evidence limits.
 
 ## Provenance
 
-This is a synthesis of the read-only source audits, candidate/build reports,
-and retained bench evidence listed in the 2026-09-24 migration reconciliation
-report at `/mnt/d/Codex/TT3/luce-bootstrap-tomi-usb-role-kernel-reconciliation-2026-09-24.md`.
-That report is a migration work product outside Git, not a new canonical LUCE
-evidence index. No firmware, device, source tree, or existing LUCE document was
-modified to prepare this reference.
+This is a synthesis of read-only source audits, candidate/build reports, and
+retained bench evidence. The targeted 2026-09-25 coverage reconciliation is
+documented outside Git at
+`/mnt/d/Codex/TT3/luce-tomidock-usb-lifecycle-coverage-fix-2026-09-25.md`.
+That report is a migration work product, not a new canonical LUCE evidence
+index. No firmware, device, or source tree was modified for this documentation
+pass.
