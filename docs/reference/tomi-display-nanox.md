@@ -56,8 +56,7 @@ Startup exports tslib paths (`/dev/input/event0`, `/dev/fb`, a `ts.conf`, plugin
 
 ## Rendering, windows, and background behavior
 
-- The established Tomi `nxbg` cue uses Nano-X calls to draw a white-ringed status disc into `GR_ROOT_WINDOW_ID` at application coordinates `(456,248)`; the color commands map to known RGB values in preserved source. The prior run-ready report identifies this as the existing live cue contract. Its hard-coded location also embeds a 480×272 layout assumption; it is not an independent framebuffer measurement.
-- A separate root-background candidate uses `GrSetWMProperties(GR_ROOT_WINDOW_ID, GR_WM_FLAGS_BACKGROUND)` and flushes the request. OpenTom server source routes the background property through expose/repaint behavior. The host mock tests validate request construction, not target visuals. A previous candidate's reported direct smoke found that the status-disc mechanism did not provide a whole-screen ready indication; it did not establish that the disc itself was invisible. The root-background helper was not target-built/deployed/visually validated in the cited work.
+- The run-ready status-disc cue, the separate whole-root-background mechanism, and their candidate-validation limits are described together under [Diagnostic cues](#diagnostic-cues) below.
 - No modern alpha-compositing guarantee is established. Background repaint, expose behavior, persistence under the active desktop, and z-order/coexistence must be treated as target-specific until directly observed.
 - V001/V002 nxbattery candidate windows are borderless, non-focus, non-resizable children of the Nano-X root. Source places V001 at default `(195,121)` with `275×68`; V002 retains width/coordinates and changes height to 90, drawing its added line at `(10,65)`. V002 report explicitly leaves target font rendering and coexistence untested. These are application geometry, not global window-manager or screen bounds.
 
@@ -75,7 +74,68 @@ V001 and V002 provide source/build validation for dynamic Nano-X clients, root-c
 
 ### Diagnostic cues
 
-`nxbg` is the strongest preserved application-level example of a short-lived Nano-X client drawing onto the root window. The run-ready/root-background candidate documents why a small root-window cue and whole-root background are different mechanisms. Candidate helpers and their tests are not production deployments unless a cited live observation says otherwise.
+The established `/mnt/sdcard/opentom/nxbg` command paints a status disc on
+`GR_ROOT_WINDOW_ID`: a 28-pixel white outer disc and 24-pixel inner disc at
+application coordinates `(456,248)`, based on a 480×272 layout assumption.
+`green` is literal `GR_RGB(0,255,0)`; historical `black` is a compatibility
+alias for the normal gray `GR_RGB(96,96,96)`, not literal black. This is a
+root-window drawing cue, not a whole-screen background. The original
+run-ready candidate reused that established cue, but it was unsuitable for
+the requested whole-desktop BLACK/GREEN presentation. The reported smoke
+showed it did not provide a whole-desktop ready indication; it did not show
+that the status disc itself was broken or invisible.
+
+The correction adds a separate candidate helper, `tomi-rootbg black|green`.
+It zero-initializes `GR_WM_PROPERTIES`, sets `flags` to
+`GR_WM_FLAGS_BACKGROUND` and `background` to the requested color, then calls
+`GrSetWMProperties(GR_ROOT_WINDOW_ID, &props)`, flushes, and exits. The
+requests are literal BLACK `GR_RGB(0,0,0)` and GREEN `GR_RGB(0,255,0)`. OpenTom
+Nano-X source shows that changing the realized unbuffered root background
+causes full-window expose/repaint processing; this source path is not proof
+that the candidate visibly changed the live Tomi desktop. A root-window
+status disc and a whole-root background are different Nano-X mechanisms.
+
+The `tomi-runready` application contract is to start BLACK and sample valid
+battery and hardware-status reads, asserted external power, and battery voltage
+of at least 4190 mV approximately every 10 seconds. The threshold was selected
+for run #4 qualification; it is not SOC, full charge, charger completion,
+capacity, or a runtime guarantee (see [power and battery semantics](tomi-power-battery.md)).
+The first qualifying sample records Linux `sysinfo().uptime`; GREEN is allowed
+after at least 600 seconds of continuous qualifying sampled conditions. Before
+READY, a below-threshold reading, invalid read, or lost external power resets
+the interval; samples are not bridged. Initial read failure exits, and six
+consecutive later read failures (about one minute at the nominal cadence)
+fail closed. Once GREEN, a later voltage dip alone does not clear READY while
+external power remains; invalid input clears the cue and requires a fresh
+qualification. External-power removal requests BLACK and exits, before or
+after READY.
+
+The correction preserved the pure state machine byte-for-byte: both packages'
+`runready_logic.h` have SHA-256
+`859d752d633fd8b50f78784c20c77ee1c8babc511f1300e51be0e4f3c03bdc8b`. The
+recorded diff changes the monitor's helper path from `nxbg` to
+`/mnt/sdcard/opentom/power/bin/tomi-rootbg`; threshold, duration, cadence,
+reset/latch, and unplug behavior did not change. All 11 synthetic state-machine
+tests passed in both work units. The correction's mock Nano-X tests and host
+source checks also passed; these establish request construction and host-side
+control flow, not rendered pixels.
+
+For the final candidate, the monitor does not call `setenv`: the launcher owns
+Nano-X library-path setup, and the forked helper inherits its
+`LD_LIBRARY_PATH`. The work-unit launch instructions set
+`LD_LIBRARY_PATH=/mnt/sdcard/opentom/lib`; if the helper cannot resolve
+`libnano-X.so`, cue invocation fails and the monitor exits fail-closed rather
+than showing READY. This is a candidate runtime instruction, not evidence of
+the exact current live library path or a deployed run-ready utility.
+
+Validation status for these two work units: `PURE_LOGIC_TESTED`,
+`HOST_SOURCE_CHECKED`, and `MOCK_NANOX_TESTED` passed; `ARM_BUILD`,
+`TARGET_SMOKE`, and `LIVE_VISUAL_VALIDATION` were not performed; `DEPLOYED`
+is false. Treat both run-ready implementations as source-reviewed,
+host-tested candidates—not as the current production indicator. The original
+`nxbg` cue has separate historical live evidence.
+Detailed work-unit and source/test provenance is recorded in
+`/mnt/d/Codex/TT3/luce-display-run-ready-coverage-fix-2026-09-25.md`.
 
 ## Direct framebuffer versus Nano-X
 
@@ -83,8 +143,8 @@ The reviewed Tomi evidence confirms that applications were developed against Nan
 
 ## Build and compatibility boundary
 
-The nxbattery artifacts were built in the pinned legacy ARM/GCC 3.3.4 environment described in [the lab environment reference](../environment/lab-environment.md), dynamically linked to `libnano-X.so` and libc. Their reports include test and ELF metadata; no target deployment occurred for these versions. Preserve the candidate binary hashes above as artifact identities, not proof of installed versions. Runtime shell and applet limits are covered by [the runtime ABI reference](tomi-runtime-abi.md).
+The nxbattery artifacts were built in the pinned legacy ARM/GCC 3.3.4 environment described in [the lab environment reference](../environment/lab-environment.md), dynamically linked to `libnano-X.so` and libc. Their reports include test and ELF metadata; no target deployment occurred for these versions. Preserve the candidate binary hashes above as artifact identities, not proof of installed versions. The run-ready/root-background candidates have host-only validation; no ARM target build or deployment is established. Runtime shell and applet limits are covered by [the runtime ABI reference](tomi-runtime-abi.md).
 
 ## Known unknowns
 
-The evidence reviewed here does not establish the active framebuffer geometry or virtual dimensions, bpp/format/channel order/stride/memory/address, framebuffer ioctls or direct-access behavior, exact deployed Nano-X/Microwindows build and library hashes, socket path, installed fonts, touch-event delivery, alpha/transparency semantics, or long-run window coexistence/repaint performance. No LCD model is inferred. A bounded live capture of `fbset -s` plus framebuffer variable/fixed info ioctls, tied to the running kernel and installed software hashes, would close the largest software-stack identity gap; direct-fb testing is not recommended absent a concrete need and a controlled recovery plan.
+The evidence reviewed here does not establish the active framebuffer geometry or virtual dimensions, bpp/format/channel order/stride/memory/address, framebuffer ioctls or direct-access behavior, exact deployed Nano-X/Microwindows build and library hashes, socket path, installed fonts, touch-event delivery, alpha/transparency semantics, or long-run window coexistence/repaint performance. The run-ready/root-background candidates' target build, runtime library resolution, end-to-end monitor/helper execution, and live whole-desktop visual behavior also remain unvalidated. No LCD model is inferred. A bounded live capture of `fbset -s` plus framebuffer variable/fixed info ioctls, tied to the running kernel and installed software hashes, would close the largest software-stack identity gap; direct-fb testing is not recommended absent a concrete need and a controlled recovery plan.
