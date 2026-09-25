@@ -104,6 +104,14 @@ The preserved reproducibility set is `/mnt/d/Codex/TT3/roundtrip-tests/tt3-nocha
 
 The matching bootloader specimen was inflated into `bootloader.decoded` for the static disassembly. The exact raw input and derived-image identities are listed above. The bounded disassembly excerpts are preserved under `/mnt/d/Codex/TT1/tt5279-disasm/`; the boot-storage predicate supplement is under `/mnt/d/Codex/TT1/tt5279-usb-boot-predicate-addendum/`.
 
+## Comparative specimen: TJ Atlas III A1.0012
+
+This is separate-family evidence, not a Tomi image or address map. The TJ ONE v8 source-storage image is `/mnt/d/Codex/TJ1/TJ_PE3398B05423_working.img` (1,027,604,480 bytes; SHA-256 `557a13ceab148b4e0f23922fccaa102f18b1ba362a603e8434356a6aea586e14`). Its extracted root-level `system` is 706,801 bytes, SHA-256 `2674420245fc0f4f5d89d6c5f8542e0dcd107b136010fd010babbf3f3971bdef`, and is a ten-section TTBL bootloader-update package. Section 0 contains a 256 KiB A1.0012/clist-216525 bootloader image; section 1 contains an ARM/CFI NOR updater; sections 2–9 hold board/display resources. The embedded bootloader payload expands to 176,400 bytes, SHA-256 `fa062c232de5eaeac69f8113bbc5f0331a8b48e3f1a6d547aad910fb35b24a08`, at `0xC0B00000`.
+
+The Atlas specimen confirms that a second TomTom platform used TTBL sections, FAT fixed-name boot selection, TTBL package parsing/loading, preboot USB support, and Linux handoff construction. Its directly recovered fixed names include `DIAGSYS`, `SIGNAPPSIGN`, `SYSTEM`, `TTSYSTEM`, `LTSYSTEM`, and `CMDLINE.TXT`. These structural similarities are family-level evidence only: Atlas uses different hardware, addresses, memory placement, and board resources. Its exact USB admission predicate and signature acceptance semantics are unresolved; Austin 5.5279 offsets, addresses, and predicate are not transferable. The preserved report supports conclusions about the analyzed update-package specimen, not byte identity with TJ's installed NOR.
+
+The related cross-family boot-drum investigation (`/mnt/d/Codex/TT3/tomtom-boot-drum-investigation-20260913/REPORT.md`) found the embedded 25,157-byte compressed sample byte-identical in the analyzed Austin 5.5279 and Atlas III 1.0012 loaders, while their audio hardware paths differ. That is a bounded shared-resource observation and does not establish loader identity or Tomi's active NOR bytes.
+
 ## Unresolved structures and limits
 
 - The first 8,192 package bytes (`0x0c–0x200b`) remain opaque; no field names are assigned.

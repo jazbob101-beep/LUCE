@@ -35,6 +35,12 @@ The `SYSTEM` file is an update/package specimen containing a 5.5279 bootloader p
 - **Reconstructed-container evidence:** historical TT3 `ttsystem` section map, payload identities, and byte-identical no-change round trip.
 - **Inference with limits:** these artifacts together support the stated Tomi boot path, but no preserved trace observes every branch and address during a current physical boot, and no acquired NOR image binds the active bootloader to the update-package specimen.
 
+## Comparative / family-level findings
+
+An independently analyzed TomTom ONE v8 / SiRF Atlas III specimen provides useful family context, not direct evidence of Tomi execution. Its root-level `system` is a distinct ten-section TTBL update package containing an A1.0012 (`clist` 216525) bootloader, a NOR updater, and board resources. The extracted loader uses FAT and fixed boot names including `DIAGSYS`, `SIGNAPPSIGN`, `SYSTEM`, `TTSYSTEM`, `LTSYSTEM`, and `CMDLINE.TXT`; it parses TTBL packages, includes preboot USB support, and constructs Linux ATAGs. This corroborates a broader TomTom bootloader architecture, while its SoC, addresses, memory placement, updater, and unresolved USB admission predicate remain Atlas-specific. In particular, Austin 5.5279's exact USB-storage predicate and any numeric address or branch must not be transferred to Atlas or used as evidence about another loader.
+
+The same Atlas III 1.0012 specimen independently calls an embedded startup-drum player before Linux handoff. The boot-drum comparison found its 25,157-byte compressed sample byte-identical to the analyzed Austin 5.5279 sample, despite materially different SoC audio backends. This supports a shared product-level sample/startup convention, not identity of the loaders or proof of Tomi's live NOR contents. Provenance: `/mnt/d/Codex/TJ1/analysis/atlas3-system-bootpath-20260911/REPORT.md` and `/mnt/d/Codex/TT3/tomtom-boot-drum-investigation-20260913/REPORT.md`.
+
 ## Known unknowns
 
 - Contents and control flow of any earlier SoC ROM/reset stage.
