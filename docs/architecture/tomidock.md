@@ -83,7 +83,7 @@ A source synthesis supports, but does not bench-prove, the remembered logo-hang 
 
 PowerFlight is a Tomi-side lifecycle/power observation and qualification tool, not a TomiDock network service and not part of the ESP forwarding path. Its rebuilt-rig model distinguishes battery return from cable removal: Tomi VBUS can be off while the USB child remains present under `USB_STATE_HOST` because data remains connected.
 
-The v001.5.3 formal run recorded `VBUS=0`, `CHARGE=0`, `CHILD=1`, `USB_STATE_HOST`, `last_error=0x0`, and `BATTERY_RETURN_CHILD_ATTACHED`; the run manifest verifies all six captured files. The archive is `/mnt/d/Codex/TT3/Evidence/powerflight-20260921-170744-7150-00.tar.gz`, SHA-256 `67a8c41caa80c09ebe2fe9114bd01ba00b5ab84343b6ef750ccb58c5e52daf8a`. This is evidence for the observed lifecycle state, not a universal electrical charging guarantee or proof of the VBUS switch implementation.
+The preserved v001.5.3 archive internally verifies: all six payload files match its embedded manifest. Its Tomi-specific kernel, USB-child, battery, GPIO/MMIO, and role records strongly support a physical Tomi bench run, but the acquisition path and exact executed binary remain unbound. The recorded state is `VBUS=0`, `CHARGE=0`, `CHILD=1`, `USB_STATE_HOST`, `last_error=0x0`, and `BATTERY_RETURN_CHILD_ATTACHED`. Archive `/mnt/d/Codex/TT3/Evidence/powerflight-20260921-170744-7150-00.tar.gz`, SHA-256 `67a8c41caa80c09ebe2fe9114bd01ba00b5ab84343b6ef750ccb58c5e52daf8a`. This is evidence for that captured lifecycle state, not a universal electrical charging guarantee or proof of the VBUS switch implementation.
 
 ## Durable design decisions
 
