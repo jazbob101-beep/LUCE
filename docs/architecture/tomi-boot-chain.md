@@ -41,6 +41,8 @@ An independently analyzed TomTom ONE v8 / SiRF Atlas III specimen provides usefu
 
 The same Atlas III 1.0012 specimen independently calls an embedded startup-drum player before Linux handoff. The boot-drum comparison found its 25,157-byte compressed sample byte-identical to the analyzed Austin 5.5279 sample, despite materially different SoC audio backends. This supports a shared product-level sample/startup convention, not identity of the loaders or proof of Tomi's live NOR contents. Provenance: `/mnt/d/Codex/TJ1/analysis/atlas3-system-bootpath-20260911/REPORT.md` and `/mnt/d/Codex/TT3/tomtom-boot-drum-investigation-20260913/REPORT.md`.
 
+In the analyzed Austin 5.5279 and Atlas III 1.0012 normal startup paths, execution calls that embedded-sample player unconditionally at the observed call site. The reviewed disassembly found no software mute/volume, power, USB, storage, reset-cause, or power-button gate around that normal-path request, and audible playback is not used as a boot-health predicate. Therefore an isolated missing startup drum while boot otherwise continues normally has no supported diagnostic significance from these two analyzed paths alone. The hardware reason for requested-but-inaudible output remains unknown, the active Tomi NOR loader is not byte-bound to the captured `SYSTEM` package, and alternate startup paths or other loader versions are not covered by this finding.
+
 ## Known unknowns
 
 - Contents and control flow of any earlier SoC ROM/reset stage.
