@@ -2,7 +2,7 @@
 
 ## Scope
 
-This is the current command and utility compatibility reference for TT3 “Tomi”. It describes the live baseline reported on 2026-09-24 and separates that observation from historical image and session evidence. “ABI” here means the practical user-space command, shell, and utility surface; it does not describe a compiled binary calling convention.
+This is the current command and utility compatibility reference for TT3 “Tomi”. It describes the live baseline reported on 2026-09-24, with later live observations incorporated where explicitly dated, and separates those observations from historical image and session evidence. “ABI” here means the practical user-space command, shell, and utility surface; it does not describe a compiled binary calling convention.
 
 The 2026-09-24 inventories below were captured directly from the live device and are authoritative for the current baseline. They are applet inventories, not a guarantee that every option or behavior commonly associated with an applet is supported.
 
@@ -290,6 +290,7 @@ This category is deliberately different from the proven-unavailable list above. 
 - `ls -ld` was observed working in the current live session. Other `ls` option combinations remain subject to the general conservative-options rule.
 - The current capture lists `printf` neither as a BusyBox applet nor as a separately confirmed shell builtin. A prior exact-image test found no `printf` applet or builtin in that tested V003 image. Avoid `printf` in portable Tomi instructions unless the live shell has been checked.
 - `cat` is in both captured BusyBox applet lists. A past smoke procedure preferred `while IFS= read -r` for a particular file-display workflow; that was a conservative choice, not evidence that `cat` is absent.
+- Although `reboot` appears in both BusyBox applet inventories, `/bin/busybox reboot` was live-observed on 2026-09-27 to return without rebooting Tomi. Do not use BusyBox `reboot` as the operational reboot method.
 
 ## Hashing
 
@@ -312,6 +313,44 @@ The explicit BusyBox invocation remains preferred in canonical instructions beca
 ## Timing helpers
 
 BusyBox `sleep` is present. Do not assume fractional sleeps. A separate executable named `tomi-usleep` was installed at `/mnt/sdcard/opentom/tomi-usleep` and successfully invoked in a 2026-08-23 terminal session. Its current presence and behavior were not established by the 2026-09-24 capability capture, so reverify it if the runtime or image has materially changed before depending on it.
+
+## Reboot behavior
+
+The operational Tomi reboot path is the OpenTom helper:
+
+```text
+/mnt/sdcard/opentom/bin/reboot
+```
+
+Live 2026-09-27 observations establish the path resolution used by the working GUI menu:
+
+- `nxmenu` runs with current working directory `/mnt/sdcard/opentom`.
+- Its live menu configuration is `/mnt/sdcard/opentom/thomas/etc/system-menu.cfg`.
+- The reboot entry is `once    Reboot|bin/reboot`.
+- Relative to the live `nxmenu` working directory, `bin/reboot` resolves to `/mnt/sdcard/opentom/bin/reboot`.
+- Choosing **Reboot** from the GUI menu rebooted Tomi as designed.
+- In contrast, `/bin/busybox reboot` was invoked from the live Telnet shell and did not reboot the device.
+
+The helper was live-observed as:
+
+```text
+path:    /mnt/sdcard/opentom/bin/reboot
+size:    117 bytes
+SHA-256: 410aaaa96541155d0ed4e570db262d6b681ef3c3b00cf6ead7757aa19b884a11
+```
+
+Its captured script text is:
+
+```sh
+#! /bin/sh
+# in case of ext2 root SDpart
+mount -oremount,ro /
+sync
+sync
+force_reboot # or echo miaou >/dev/watchdog
+```
+
+For generated bench instructions, use the absolute helper path `/mnt/sdcard/opentom/bin/reboot` when a reboot is required. Do not substitute `/bin/busybox reboot`. The absolute helper path has not yet been separately invoked from Telnet solely as a synthetic proof; its operational status is supported by the live GUI path-resolution evidence and will be reconfirmed the next time a natural reboot step occurs.
 
 ## Standalone OpenTom utilities
 
@@ -336,6 +375,7 @@ When writing Tomi-side commands:
 4. Avoid the unavailable commands listed above, and do not assume commands in the unestablished list without separate proof.
 5. Avoid `head -1`, `sha256sum -c`, unverified grep context/extended options, and fractional sleep assumptions.
 6. Keep current runtime facts distinct from image-specific historical tests and older terminal sessions.
+7. When rebooting Tomi, use `/mnt/sdcard/opentom/bin/reboot`; do not use `/bin/busybox reboot`.
 
 ## Related runbooks
 
@@ -345,4 +385,6 @@ The [Tomi File Transfer runbook](../runbooks/tomi-file-transfer.md) owns the cur
 
 Current live baseline: operator-provided direct-device capture dated 2026-09-24, preserved with the migration request; the captured inventories and observations above are presented as current bench facts. This reference does not claim independent reacquisition during migration.
 
-Historical compatibility evidence: `/mnt/d/Codex/usbmode-authoritative-state-v004-blackbox-compat-20260903/COMMAND_COMPATIBILITY.md` and `EXACT_RUNTIME.json` describe an exact BusyBox extracted from a hash-verified V003 image, exercised under ARM emulation. Those results are image-scoped and do not replace the 2026-09-24 live inventories.
+Supplemental live reboot-path evidence was captured directly from Tomi on 2026-09-27: the live `nxmenu` process and working directory, `system-menu.cfg` reboot entry, custom helper size/hash/text, successful GUI reboot behavior, and inert `/bin/busybox reboot` behavior. The absolute helper path will be naturally reconfirmed from Telnet when a future workflow next requires a reboot rather than by adding a synthetic reboot cycle solely for documentation.
+
+Historical compatibility evidence: `/mnt/d/Codex/usbmode-authoritative-state-v004-blackbox-compat-20260903/COMMAND_COMPATIBILITY.md` and `EXACT_RUNTIME.json` describe an exact BusyBox extracted from a hash-verified V003 image, exercised under ARM emulation. Those results are image-scoped and do not replace the current live observations.
