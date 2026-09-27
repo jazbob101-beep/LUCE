@@ -8,38 +8,60 @@ This document is the canonical owner for RFNAV behavior, qualification state, pr
 
 ## Current qualified baseline
 
-The current qualified RFNAV baseline is **RFNAV-004**.
+The current qualified RFNAV baseline is **RFNAV-005**.
 
-RFNAV-004 retains the physically qualified RFNAV-003 ESP firmware and RFN1 transport unchanged and adds the first real Tomi-side Nano-X live signal instrument display.
+RFNAV-005 retains the physically qualified RFNAV-003 RFN1 telemetry architecture and the RFNAV-004 live signal model, then adds desktop integration, operator-driven Wi-Fi discovery, paged touchscreen target selection, TRACK / Change Target workflow, control-plane recovery, and stricter protocol validation.
 
 Qualified ESP application image:
 
 ```text
-SHA-256: 30bb4799a0dfb6638a4582eb4c9f01f24f75b9e482c14a8c4147c120884600c4
+size: 818848 bytes
+SHA-256: 1d8d1bce5e30f0f3ccc5ef8f0e03df1372bbe69729f1b46d8d35cfcadec83a09
 ```
 
-ESP source candidate:
+ESP source:
 
 ```text
-/home/jazbob/opentom/lab-work/esp32-s3/tomi-s3-native-ecm-v002-routing-v001-nogpio-phase3-rfnav-v003
+/home/jazbob/opentom/lab-work/esp32-s3/tomi-s3-native-ecm-v002-routing-v001-nogpio-phase3-rfnav-v005
 ```
 
 Qualified Tomi UI:
 
 ```text
-/mnt/sdcard/opentom/rfnav/ui/nxrfnav-v001
-size: 13708 bytes
-SHA-256: a7947016ae034199dcbab1240635f503cf2f003226c04e19ca0ccabda90ef365
+/mnt/sdcard/opentom/rfnav/ui/nxrfnav-v002
+size: 20148 bytes
+SHA-256: 865cf76ddbe11ea1a383eea0ef107f23fbe85399d92933257317f28fbc680ba2
 ```
 
-Reviewed UI source:
+Tomi source:
 
 ```text
-/home/jazbob/opentom/lab-work/tomi/nxrfnav-v001/nxrfnav.c
-SHA-256: 5036c630b932bf915d955b78fe9639c942354ccad176f7fdc9092b691681da49
+/home/jazbob/opentom/lab-work/tomi/nxrfnav-v002
 ```
 
-The UI was built with the pinned legacy Tomi toolchain, `arm-linux-gcc (GCC) 3.3.4`, in the Bookworm chroot and links only `libnano-X.so` and `libc.so.6` dynamically.
+The qualified UI was built with the pinned legacy Tomi toolchain, `arm-linux-gcc (GCC) 3.3.4`, in the Bookworm chroot and links only `libnano-X.so` and `libc.so.6` dynamically. The only reported target-build warning is the known historical Nano-X `index` shadow warning.
+
+The live desktop launcher was reconciled against the installed Tomi configuration rather than replacing it wholesale. Qualified merged launcher identity:
+
+```text
+/mnt/sdcard/opentom/thomas/etc/nxlaunch.cnf
+size: 217 bytes
+SHA-256: 54651633d90457e55425ac43ffe9b8ac6f892d2e79fad823937027ed972d6057
+```
+
+RFNAV launcher entry:
+
+```text
+RFNAV /mnt/sdcard/opentom/rfnav/ui/rfnav.pgm /mnt/sdcard/opentom/rfnav/ui/nxrfnav-v002
+```
+
+RFNAV icon identity:
+
+```text
+/mnt/sdcard/opentom/rfnav/ui/rfnav.pgm
+size: 3966 bytes
+SHA-256: bc857525b11dd780a522a0845d2d3b6337ade42c50f8734914e952fe08b2ba55
+```
 
 The earlier diagnostic receiver remains available at:
 
@@ -49,20 +71,17 @@ size: 6512 bytes
 SHA-256: f55ee0c5c73a36df570d51ed8bf290f84b0547fc42204bb77d3442109f348ef6
 ```
 
-`rfnav-rx` is diagnostic plumbing. `nxrfnav-v001` is now the qualified user-facing RFNAV consumer.
+`rfnav-rx` remains diagnostic plumbing. `nxrfnav-v002` is the qualified user-facing RFNAV application.
 
 ## RFNAV-002 behavior retained
 
-RFNAV-004 retains the RFNAV-002 behavior through the unchanged RFNAV-003 ESP baseline:
+RFNAV-005 retains the established RFNAV focused-scan behavior beneath the operator-selected target workflow:
 
-1. one full active Wi-Fi discovery scan after network settlement;
-2. deterministic target selection excluding the associated AP when possible;
-3. preference for the strongest non-associated AP on a different channel, otherwise the strongest non-associated AP, otherwise the strongest visible AP;
-4. repeated nonblocking scans filtered to the selected BSSID and channel;
-5. a nominal 2-second quiet interval between target scans;
-6. target RSSI reporting when observed;
-7. rediscovery after five consecutive valid target misses;
-8. target invalidation and fresh discovery when Wi-Fi state changes.
+1. repeated nonblocking scans filtered to the selected BSSID and channel;
+2. a nominal 2-second quiet interval between target scans;
+3. target RSSI reporting when observed;
+4. rediscovery after five consecutive valid target misses;
+5. target invalidation and fresh discovery when Wi-Fi state changes.
 
 Target scans retain active maximum dwell 120 ms and home-channel dwell 30 ms. Wi-Fi power save remains ESP-IDF 5.5.5 `WIFI_PS_MIN_MODEM`. RFNAV does not use GPIO4 and does not alter TomiDock USB lifecycle policy.
 
@@ -88,7 +107,7 @@ Physical instrumentation measured a worst-case `sys_evt` high-water mark of 1648
 
 That observed use exceeds the old 2816-byte allocation by approximately 144 bytes. RFNAV-002.2 then passed standalone and full TomiDock physical qualification. This closes the RFNAV-002.1 reset root cause as event-task stack exhaustion under the repeated targeted-scan workload.
 
-RFNAV-003 and RFNAV-004 retain `CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096` and the `SYS_EVT_HEALTH` diagnostic.
+RFNAV-003, RFNAV-004, and RFNAV-005 retain `CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096` and the `SYS_EVT_HEALTH` diagnostic.
 
 ## RFNAV-003 Tomi telemetry architecture
 
@@ -211,21 +230,103 @@ The application then remained running continuously for approximately **12 hours*
 - the weak-to-strong presentation behaved correctly across observed signal changes;
 - no UI or RFNAV functional issue was reported.
 
-This extended run materially exceeds the original short smoke/soak intent and qualifies `nxrfnav-v001` as the current live RFNAV user interface for the observed normal target-tracking workload.
+This extended run materially exceeds the original short smoke/soak intent and qualifies `nxrfnav-v001` as the RFNAV-004 user-facing interface for the observed normal target-tracking workload.
 
 Host-side qualification separately covers bounded RFN1 parsing, all five protocol event types, malformed/oversized input, sequence continuity/wrap/gap/rewind handling, source and epoch changes, stale/no-telemetry timeouts, trend behavior, and gauge clamping. Those host tests complement but do not imply that every exceptional RFN1 state was deliberately forced during the 12-hour physical run.
 
+## RFNAV-005 discovery and target-selection architecture
+
+RFNAV-005 adds a bidirectional product-control plane on the existing ECM subnet while retaining RFN1 telemetry unchanged:
+
+```text
+Tomi 192.168.77.1  -> ESP 192.168.77.2 UDP/5516   RFC1 commands
+ESP  192.168.77.2  -> Tomi 192.168.77.1 UDP/5517   RFD1 / RFA1 replies
+ESP  192.168.77.2  -> Tomi 192.168.77.1 UDP/5515   RFN1 telemetry unchanged
+```
+
+Control and discovery records are newline-terminated bounded ASCII records:
+
+```text
+RFC1 req=<u32> cmd=DISCOVER
+RFC1 req=<u32> cmd=SELECT target=<12hex>
+
+RFD1 req=<u32> idx=<0..47> total=<0..48> target=<12hex> ch=<1..14> rssi=<-128..127> assoc=<0|1> ssidhex=<hex|none>
+
+RFA1 req=<u32> cmd=DISCOVER status=OK total=<0..48> truncated=<0|1>
+RFA1 req=<u32> cmd=SELECT status=OK target=<12hex>
+```
+
+Discovery retains at most 48 APs, orders them strongest first with a deterministic BSSID tie-break, and carries SSID as bounded hexadecimal data rather than trusting display text from the radio result. SELECT is authorized only against a sufficiently recent discovery result from the same Wi-Fi epoch. Tomi retries a request with the same request ID; the ESP replay path is bounded and epoch-aware.
+
+The control service has one socket owner and a bounded reply queue. Transient ECM unavailability or socket setup failure does not permanently kill the control plane. Low-frequency `RFNAV_CTRL: HEALTH` telemetry exposes readiness, receive/accept/reject counts, queue drops, sends, socket/send failures, reply drops, and stack margin.
+
+The RFNAV worker remains the canonical owner of target state. Manual DISCOVER does not silently replace the active target. Manual SELECT updates that canonical target and uses the existing RFN1 SELECT event to synchronize the live TRACK display.
+
+### RFNAV-005 Tomi UX
+
+`nxrfnav-v002` integrates with the normal Nano-X desktop and has two primary screens:
+
+- **DISCOVER:** paged nearby-AP list with sanitized SSID, abbreviated target identity, channel, RSSI/strength, associated-AP indication, PREV/NEXT navigation, RESCAN, and CLOSE;
+- **TRACK:** selected target identity, channel, raw RSSI, progressive gauge, trend, freshness, Change Target, and CLOSE.
+
+The UI preserves the RFNAV-004 signal model and freshness behavior while adding strict RFC1/RFD1/RFA1 numeric parsing, incomplete-discovery discard, request/reply matching, and the target-selection state machine.
+
+A second application instance is rejected rather than competing for the RFN1 UDP/5515 consumer role. CLOSE releases the application resources so the diagnostic receiver or a later RFNAV launch can bind the port normally.
+
+## RFNAV-005 review and repair closure
+
+The initial RFNAV-005 candidate produced the intended desktop and visual UX but the first physical DISCOVER attempt timed out. A later independent Astra review was deliberately asked to audit the implementation rather than assume the leading diagnosis was correct.
+
+That review **rejected the proposed early-bind/address-absence explanation as stated**. In the actual startup order the static ECM interface is initialized before RFNAV startup, and the pinned lwIP UDP bind implementation does not require the requested local address to be owned by a live interface in the way the hypothesis assumed.
+
+The review did reproduce and repair several real defects:
+
+- transient control socket/setup failure could permanently terminate the control task;
+- control initialization failure could bypass the focused-scan delay;
+- replay state could reference stale epochs or discovery data overwritten by a failed scan;
+- Tomi reply parsing accepted overflowing request IDs, allowing an out-of-range decimal value to alias a smaller `u32` request ID;
+- an incomplete discovery list could remain selectable after timeout/error.
+
+Regression tests exercise production control-task and worker logic, including delayed ECM availability, injected setup failures, ECM loss/recovery, persistent errors, discovery while tracking, replay, selection, expiry, malformed input, and strict Tomi protocol parsing. The original source snapshots fail the new regressions; the repaired source passes the expanded host tests, ASan/UBSan checks, GNU89 syntax checks, and an ESP-IDF 5.5.5 full clean build.
+
+The exact cause of the **original pre-repair physical DISCOVER timeout remains unresolved** because the original run did not preserve the listener-status and request/reply discriminator data needed to bind that failure to one repaired defect. Qualification therefore rests on the repaired candidate's positive physical results, not on a retrospective causal claim about the first timeout.
+
+## RFNAV-005 physical qualification
+
+RFNAV-005 passed physical qualification on 2026-09-27 with the repaired ESP and Tomi artifacts identified above.
+
+The startup qualification deliberately booted the ESP before Tomi/ECM was present, then attached Tomi later. The resulting product path became operational and DISCOVER populated a real nearby-AP list. The first operator-visible discovery produced six pages of APs; a later RESCAN produced five pages because at least one previously visible AP was no longer present, which is normal radio-environment variation rather than stale-list behavior.
+
+Operator qualification established:
+
+- PREV/NEXT worked across the multi-page list; button size and placement were reported fully usable on the physical resistive touchscreen;
+- RESCAN repopulated the AP set cleanly;
+- a non-associated AP could be selected and transitioned to TRACK with sane target/channel/RSSI data;
+- gauge and reading changed with live signal conditions and did not become stale during observation;
+- Change Target returned to discovery and a second non-associated AP selected and tracked correctly;
+- CLOSE returned to the Nano-X desktop as designed;
+- RFNAV relaunched successfully and a second complete examination found no issue;
+- the duplicate-instance guard passed;
+- UDP/5515 ownership cleanup passed, allowing the diagnostic receiver to bind after RFNAV closed;
+- one bounded ECM loss/recovery test passed without reviving broad historical detach-anomaly cycling.
+
+The instrumented recovery capture showed the intended lifecycle explicitly: RFNAV control entered `waiting_for_ecm`; ECM reported suspended/unready and routing/NAPT/TCP2323 disabled; `RFNAV_CTRL: HEALTH` reported `ready=0`; the control service later reported `ready local=192.168.77.2:5516`; ECM returned ready in a new generation; and routing/NAPT/TCP2323 returned. Manual DISCOVER then succeeded again after recovery, with later captures retaining 12 and 14 APs respectively. Control health after recovery remained clean, with accepted requests and zero recorded rejects, queue drops, send errors, socket errors, or reply drops in the preserved sample.
+
+Associated-uplink AP selection was intentionally **not** exercised during this qualification. The discovery representation includes the associated AP, but selecting the currently associated uplink remains an unqualified edge case and is not part of the RFNAV-005 PASS claim.
+
 ## Current design conclusions
 
-- RFNAV discovery/focused scanning and TomiDock networking coexist stably.
-- The RFNAV-002 reset root cause remains closed as insufficient `sys_evt` stack; the qualified RFNAV-003 ESP baseline remains unchanged beneath RFNAV-004.
-- RFNAV telemetry is delivered directly from ESP `192.168.77.2` to Tomi `192.168.77.1` over CDC-ECM UDP without routing the product path through the Wi-Fi LAN.
-- The sender remains isolated from `sys_evt`; telemetry transport failures are nonfatal and subordinate to RFNAV/TomiDock control flow.
-- RFNAV-003 proved the transport losslessly over a 484-record receiver window.
-- RFNAV-004 proves that Tomi can consume that stream directly as a practical live Nano-X field display.
-- `nxrfnav-v001` is the current qualified user-facing RFNAV application.
-- RSSI is treated as received signal strength, not physical distance.
-- The approximately 12-hour RFNAV-004 endurance result is strong operational evidence but remains an operator observation rather than an instrumented continuous log.
+- **RFNAV-005 is the current physically qualified RFNAV baseline.**
+- `nxrfnav-v002` is the current qualified user-facing RFNAV application.
+- RFNAV discovery, paged target selection, live tracking, target changes, close/relaunch, single-instance handling, and UDP/5515 cleanup all work on the physical Tomi/TomiDock system.
+- The RFNAV control plane recovers from a bounded real ECM loss/recovery cycle without permanently dying.
+- The original pre-repair DISCOVER timeout's exact cause remains unresolved; do not rewrite history as though the later review proved one specific causal defect.
+- The associated-uplink AP selection path remains physically untested and is outside the current qualification claim.
+- The RFNAV-002 reset root cause remains closed as insufficient `sys_evt` stack; RFNAV-005 retains the 4096-byte configured event-task allocation.
+- RFNAV telemetry remains direct UDP over ECM, ESP `192.168.77.2` to Tomi `192.168.77.1:5515`; the product path is not routed through the Wi-Fi LAN.
+- Control/discovery traffic remains direct over ECM on UDP/5516 and UDP/5517.
+- Socket/formatting work remains outside `sys_evt` / Wi-Fi callback context.
+- RSSI is received signal strength, not physical distance.
 
 ## Safety and operating constraints
 
@@ -233,7 +334,7 @@ RFNAV inherits all TomiDock electrical and USB safety constraints. Never connect
 
 Do not reintroduce GPIO4 monitoring or gating. GPIO4 is unconnected and has no runtime role in the current TomiDock design.
 
-Do not perform routine USB detach-anomaly cycling as an RFNAV qualification step. Preserve an unsolicited lifecycle anomaly if one occurs during otherwise authorized work, but RFNAV development does not reopen that retired investigation.
+Do not perform routine USB detach-anomaly cycling as an RFNAV qualification step. RFNAV-005's one bounded ECM recovery check does not reopen the retired detach-anomaly investigation. Preserve an unsolicited lifecycle anomaly if one occurs during otherwise authorized work, but do not turn ordinary RFNAV work into broad lifecycle cycling.
 
 ## Development stages
 
@@ -245,12 +346,13 @@ Completed:
 - **RFNAV-002.2:** increase and instrument `sys_evt` stack; pass standalone and full-stack physical qualification.
 - **RFNAV-003:** establish and physically qualify direct Tomi-facing RFN1 telemetry over the existing ECM link, including a Tomi-native diagnostic receiver.
 - **RFNAV-004:** build and physically qualify the first Tomi-native live RF signal display, including extended approximately 12-hour continuous operation.
+- **RFNAV-005:** add desktop product UX, nearby-AP discovery, paged touchscreen target selection, TRACK / Change Target workflow, robust RFC1/RFD1/RFA1 control/reply handling, and physically qualify startup ordering plus bounded ECM recovery.
 
 Next planned stage:
 
-- **RFNAV-005:** scope is not yet adjudicated. The leading product directions are richer operator target-selection workflow and GPS correlation/navigation context. Choose the next milestone explicitly before implementation rather than combining both by default.
+- **RFNAV-006 scope is not yet adjudicated.** GPS correlation/navigation context is the leading product direction, but choose the milestone explicitly before implementation.
 
-Later work may also add mapping, persistence, and BLE discovery/tracking. Those are not RFNAV-004 claims.
+Later work may also add mapping, persistence, associated-uplink edge-case qualification, and BLE discovery/tracking. Those are not RFNAV-005 claims.
 
 ## Provenance
 
@@ -355,5 +457,57 @@ SHA-256 104065668d53909f19b26b0baee52fb6f943b12631f85773a0e501213eaa6dba
 ```
 
 The physical UI smoke test is supported by the operator-supplied live-screen photograph. The approximately 12-hour endurance result is operator-reported and is intentionally recorded as such rather than represented as a continuous instrumented log.
+
+### RFNAV-005
+
+Original RFNAV-005 implementation evidence:
+
+```text
+/mnt/d/Codex/TT3/rfnav-005-ux-target-selection-20260927/
+```
+
+Independent review and repaired-candidate evidence:
+
+```text
+/mnt/d/Codex/TT3/rfnav-005-astra-review-repair-20260927/
+```
+
+Astra review report:
+
+```text
+ASTRA_REVIEW_AND_REPAIR_REPORT.md
+SHA-256 f70a85e6ed32f02fe773468b9d37b1a902a3ba8814b712733b93fa584592e8c2
+```
+
+Qualified ESP application:
+
+```text
+size 818848 bytes
+SHA-256 1d8d1bce5e30f0f3ccc5ef8f0e03df1372bbe69729f1b46d8d35cfcadec83a09
+```
+
+MacBook target-build script used for the repaired Tomi UI:
+
+```text
+build-on-macbook.sh
+SHA-256 514f6aff3bf3b109a03eeb3d59e54bb6b2bd09aef476eba8245fc5326d264af3
+```
+
+Qualified Tomi UI:
+
+```text
+nxrfnav-v002
+size 20148 bytes
+SHA-256 865cf76ddbe11ea1a383eea0ef107f23fbe85399d92933257317f28fbc680ba2
+```
+
+Operator-supplied instrumented physical-qualification capture used for final adjudication:
+
+```text
+size 52489 bytes
+SHA-256 f964b6491cfa49c9eda954c30346765d1490bc41fb135506eebd9a197bf6f3f5
+```
+
+The preserved capture directly records healthy control traffic, successful manual discoveries, a real ECM unready interval, control-plane transition to `ready=0`, later `ready local=192.168.77.2:5516`, ECM/routing recovery in a new generation, and successful post-recovery manual discovery. Touch usability, two non-associated target selections, CLOSE/relaunch, duplicate-instance rejection, and UDP/5515 cleanup are operator-observed physical results.
 
 Raw logs and experiment artifacts remain evidence rather than Git documentation. Retain them in the established Codex evidence warehouse. This canonical document records byte identities and adjudicated durable conclusions without reproducing private RF identifiers.
