@@ -4,13 +4,13 @@
 
 RFNAV repurposes TT3 “Tomi” and TomiDock as a geographically aware RF signal navigator. Tomi provides GPS, touchscreen, Linux, and battery operation; the ESP32-S3 in TomiDock provides Wi-Fi/BLE radio capability. The intended product direction is to discover authorized nearby transmitters, select a target, measure signal strength repeatedly, and correlate that telemetry with Tomi-side state so Tomi can eventually help navigate toward a signal source.
 
-This document is the canonical owner for RFNAV behavior, qualification state, protocol, and staged development. TomiDock USB/network architecture, lifecycle behavior, and electrical safety remain owned by [TomiDock Architecture](tomidock.md).
+This document is the canonical owner for RFNAV behavior, qualification state, protocol, UI behavior, and staged development. TomiDock USB/network architecture, lifecycle behavior, and electrical safety remain owned by [TomiDock Architecture](tomidock.md).
 
 ## Current qualified baseline
 
-The current qualified RFNAV baseline is **RFNAV-003**.
+The current qualified RFNAV baseline is **RFNAV-004**.
 
-It retains the RFNAV-002.2 discovery and focused-RSSI scan engine, the qualified `sys_evt` stack repair, and normal TomiDock CDC-ECM/routing behavior, and adds a Tomi-facing UDP telemetry path over the existing ECM link.
+RFNAV-004 retains the physically qualified RFNAV-003 ESP firmware and RFN1 transport unchanged and adds the first real Tomi-side Nano-X live signal instrument display.
 
 Qualified ESP application image:
 
@@ -24,7 +24,24 @@ ESP source candidate:
 /home/jazbob/opentom/lab-work/esp32-s3/tomi-s3-native-ecm-v002-routing-v001-nogpio-phase3-rfnav-v003
 ```
 
-Qualified Tomi receiver:
+Qualified Tomi UI:
+
+```text
+/mnt/sdcard/opentom/rfnav/ui/nxrfnav-v001
+size: 13708 bytes
+SHA-256: a7947016ae034199dcbab1240635f503cf2f003226c04e19ca0ccabda90ef365
+```
+
+Reviewed UI source:
+
+```text
+/home/jazbob/opentom/lab-work/tomi/nxrfnav-v001/nxrfnav.c
+SHA-256: 5036c630b932bf915d955b78fe9639c942354ccad176f7fdc9092b691681da49
+```
+
+The UI was built with the pinned legacy Tomi toolchain, `arm-linux-gcc (GCC) 3.3.4`, in the Bookworm chroot and links only `libnano-X.so` and `libc.so.6` dynamically.
+
+The earlier diagnostic receiver remains available at:
 
 ```text
 /mnt/sdcard/opentom/rfnav/bin/rfnav-rx
@@ -32,11 +49,11 @@ size: 6512 bytes
 SHA-256: f55ee0c5c73a36df570d51ed8bf290f84b0547fc42204bb77d3442109f348ef6
 ```
 
-The receiver was built with the pinned legacy Tomi toolchain, `arm-linux-gcc (GCC) 3.3.4`, in the Bookworm chroot. Its reviewed source SHA-256 is `6ca6824603e61ca0b76f358b3e8d5c03947c51b66d12d72b33b924e5af74fccd`.
+`rfnav-rx` is diagnostic plumbing. `nxrfnav-v001` is now the qualified user-facing RFNAV consumer.
 
 ## RFNAV-002 behavior retained
 
-RFNAV-003 retains the RFNAV-002 behavior:
+RFNAV-004 retains the RFNAV-002 behavior through the unchanged RFNAV-003 ESP baseline:
 
 1. one full active Wi-Fi discovery scan after network settlement;
 2. deterministic target selection excluding the associated AP when possible;
@@ -71,11 +88,11 @@ Physical instrumentation measured a worst-case `sys_evt` high-water mark of 1648
 
 That observed use exceeds the old 2816-byte allocation by approximately 144 bytes. RFNAV-002.2 then passed standalone and full TomiDock physical qualification. This closes the RFNAV-002.1 reset root cause as event-task stack exhaustion under the repeated targeted-scan workload.
 
-RFNAV-003 retains `CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096` and the `SYS_EVT_HEALTH` diagnostic.
+RFNAV-003 and RFNAV-004 retain `CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096` and the `SYS_EVT_HEALTH` diagnostic.
 
 ## RFNAV-003 Tomi telemetry architecture
 
-RFNAV-003 adds a unidirectional telemetry path directly across the existing ECM subnet:
+RFNAV-003 added a unidirectional telemetry path directly across the existing ECM subnet:
 
 ```text
 ESP ECM peer 192.168.77.2
@@ -95,7 +112,7 @@ Each Tomi-bound datagram contains one newline-terminated ASCII record:
 RFN1 seq=<u32> epoch=<u32> event=<SELECT|OBS|MISS|REDISCOVER|INVALIDATE> target=<12hex|none> ch=<0..14> rssi=<-128..127|na> misses=<0..255>
 ```
 
-SSID is intentionally not carried in RFNAV-003. Target identity is the BSSID encoded as twelve hexadecimal digits without separators. Do not reproduce bench-specific BSSIDs in public canonical documentation.
+SSID is intentionally not carried. Target identity is the BSSID encoded as twelve hexadecimal digits without separators. Do not reproduce bench-specific BSSIDs in public canonical documentation.
 
 ### ESP execution model
 
@@ -110,94 +127,105 @@ Telemetry publication is subordinate to RFNAV scanning and TomiDock operation:
 
 Low-frequency `RFNAV_TX_HEALTH` telemetry reports sender stack margin and counters alongside the existing `RFNAV_HEALTH` and `SYS_EVT_HEALTH` diagnostics.
 
-### Tomi receiver
+### Tomi diagnostic receiver
 
-`rfnav-rx` is a small Tomi-native UDP receiver built with the pinned GCC 3.3.4 target toolchain. It binds UDP/5515, validates the `RFN1` prefix and bounded datagram length, records the sender IPv4 address, tracks receive count and sequence continuity, and reports gaps, rewinds, malformed records, and oversized records. It is a proof/diagnostic consumer, not the final RFNAV UI.
+`rfnav-rx` is a small Tomi-native UDP receiver built with the pinned GCC 3.3.4 target toolchain. It binds UDP/5515, validates the `RFN1` prefix and bounded datagram length, records the sender IPv4 address, tracks receive count and sequence continuity, and reports gaps, rewinds, malformed records, and oversized records.
 
 ## RFNAV-003 physical qualification
 
 RFNAV-003 was tested in the normal TomiDock topology with Tomi attached as USB host, CDC-ECM mounted, routing/NAPT and TCP/2323 active, the Tomi-native `rfnav-rx` receiver bound to UDP/5515, continuous LAN ping running, LAN-side UDP diagnostics active, and repeated RFNAV target scans continuing.
 
-### Tomi receiver result
+The receiver captured **484 consecutive RFN1 datagrams**, sequence 106 through 589, all from `192.168.77.2`, with zero gaps, rewinds, source changes, malformed records, or oversized records. This physically proved direct ESP-to-Tomi RFN1 delivery over the ECM link.
 
-The Tomi receiver captured **484 consecutive RFN1 datagrams**:
-
-```text
-first captured sequence: 106
-last captured sequence:  589
-sender:                  192.168.77.2
-receiver gaps:           0
-receiver rewinds:        0
-source changes:          0
-malformed records:       0
-oversized records:       0
-```
-
-All 484 captured records in this qualification window were `OBS` events for the selected target. The receiver began after RFNAV telemetry was already running, so absence of a `SELECT` record in this particular capture is not evidence that the protocol lacks or failed that event type.
-
-The clean sequence span from 106 through 589 contains exactly 484 sequence values, independently matching the receiver's final `rx=484` count.
-
-This physically proves direct ESP-to-Tomi RFN1 delivery over the ECM link from the ESP peer address rather than LAN-side delivery.
-
-### ESP telemetry result
-
-Before Tomi mounted, the sender correctly accumulated ECM-unready drops. At the last pre-mount health sample, `sent=0` and `ecm_drop` was increasing while ECM was not ready.
-
-After the single observed USB MOUNT, TomiDock reported routing ready with ECM `192.168.77.2`, NAPT enabled, the TCP/2323 forward enabled, and no subsequent suspend/unmount in the qualification log.
-
-During the qualified run:
+During the same qualification:
 
 - `RFNAV_TX_HEALTH` reached at least `sent=506`;
-- `qdrop=0` throughout;
-- `send_err=0` throughout;
-- `stale_drop=0` throughout;
-- `backoff_drop=0` throughout;
+- `qdrop=0`, `send_err=0`, `stale_drop=0`, and `backoff_drop=0` throughout while Tomi was present;
 - `ecm_drop` stabilized at 96 after Tomi became available;
 - sender-task stack high-water mark settled at 2104 free bytes;
 - `sys_evt` high-water mark remained 1648 free bytes;
 - RFNAV worker high-water mark remained 1148 free bytes;
-- minimum-ever free heap reached 195732 bytes and then remained stable in the retained final health samples.
+- minimum-ever free heap reached 195732 bytes and then remained stable in retained final health samples;
+- 538/538 target scans completed with `status=0`;
+- zero RFNAV rediscoveries occurred;
+- 1,828/1,828 LAN ping samples succeeded;
+- no panic, stack overflow, reboot, Wi-Fi disconnect, USB suspend, or USB unmount was observed.
 
-The `ecm_drop=96` count is expected pre-mount loss, not an in-service transport failure.
+RFNAV-003 therefore passed physical qualification as the Tomi-facing telemetry transport baseline.
 
-### RFNAV and TomiDock coexistence
+## RFNAV-004 Tomi live signal display
 
-The full ESP diagnostic observation covered approximately 19 minutes. It recorded:
+RFNAV-004 is Tomi-side only. The ESP firmware and RFN1 protocol remain the qualified RFNAV-003 baseline unchanged.
 
-- 538 target scan requests;
-- 538 target scan starts;
-- 538 target scan completions;
-- all 538 scan completions with `status=0`;
-- one isolated target miss, occurring before Tomi mounted;
-- zero RFNAV rediscoveries;
-- median target-scan duration about 123 ms;
-- p95 target-scan duration about 124 ms;
-- maximum target-scan duration 182 ms;
-- 219 post-mount ECM snapshots, all linked, connected, mounted, unsuspended, and ready;
-- 218 post-mount routing snapshots, all ECM-ready, Wi-Fi-ready, forwarding-enabled, NAPT-enabled, TCP/2323-enabled, and error-free;
-- no panic, stack overflow, Guru Meditation, abort, reboot, Wi-Fi disconnect, USB suspend, or USB unmount.
+The user-facing application is `nxrfnav-v001`. It binds UDP/5515 directly and is an alternate consumer to `rfnav-rx`; the diagnostic receiver should not hold the port while the UI runs.
 
-The LAN ping capture recorded 1,828 successful replies across approximately 18 minutes 37 seconds with no failure/error lines. Observed ping statistics were approximately:
+### Display behavior
 
-```text
-median: 100 ms
-mean:    99.3 ms
-p95:    201 ms
-p99:    267 ms
-max:    451 ms
+The 480x272 Nano-X display presents:
+
+- abbreviated target identity;
+- current Wi-Fi channel;
+- large raw RSSI in dBm;
+- a progressive signal-strength gauge using smoothed RSSI;
+- stronger / steady / weaker trend classification;
+- current target state;
+- live / stale / no-telemetry freshness state.
+
+The gauge clamps approximately `-90 dBm` through `-30 dBm`. Smoothing uses an integer EMA with alpha 0.5. Trend compares a short four-reading smoothed history with a +/-2 dB deadband. Freshness is classified as LIVE through 5 seconds, STALE through 10 seconds, and NO TELEMETRY after that.
+
+The UI parses the qualified RFN1 events directly. SELECT establishes a target and resets signal history; OBS updates RSSI, smoothing, gauge, trend, and freshness; MISS suppresses current RSSI while briefly retaining the prior gauge state; REDISCOVER clears current signal/trend interpretation; INVALIDATE clears the active target and signal history.
+
+The application uses a nonblocking UDP socket plus a timed Nano-X event wait and does not require per-packet dynamic allocation or a background shell pipeline.
+
+### Target-toolchain compatibility cleanup
+
+The initial target build emitted an implicit `snprintf` declaration warning under GCC 3.3.4. The source was corrected by defining:
+
+```c
+#define _ISOC99_SOURCE 1
 ```
 
-RFNAV-003 therefore passes physical qualification as the Tomi-facing telemetry transport baseline.
+before the existing POSIX feature macro and all includes. The pinned glibc 2.3 headers then exposed the C99 `snprintf` declaration correctly.
+
+The corrected canonical rebuild emitted no `snprintf` warning. The only remaining warning came from the historical Nano-X header's `index` declaration shadowing a global declaration.
+
+The corrected source produced the same stripped executable bytes as the earlier build:
+
+```text
+size: 13708 bytes
+SHA-256: a7947016ae034199dcbab1240635f503cf2f003226c04e19ca0ccabda90ef365
+```
+
+This confirms the feature-test correction changed declaration visibility without changing generated target machine code.
+
+## RFNAV-004 physical qualification
+
+RFNAV-004 was deployed to Tomi and launched against the already-qualified RFNAV-003 live telemetry stream.
+
+The initial live-screen smoke test showed the Nano-X UI rendering correctly and consuming current RFN1 OBS telemetry. Target identity, channel, numeric RSSI, signal-strength gauge, target state, trend state, and freshness state populated on the physical Tomi display.
+
+The application then remained running continuously for approximately **12 hours**. This endurance result is operator-observed rather than backed by a continuous 12-hour packet/diagnostic log. During that interval:
+
+- no functional instability was observed;
+- the signal-strength gauge moved in unison with the displayed RSSI as signal conditions changed;
+- the weak-to-strong presentation behaved correctly across observed signal changes;
+- no UI or RFNAV functional issue was reported.
+
+This extended run materially exceeds the original short smoke/soak intent and qualifies `nxrfnav-v001` as the current live RFNAV user interface for the observed normal target-tracking workload.
+
+Host-side qualification separately covers bounded RFN1 parsing, all five protocol event types, malformed/oversized input, sequence continuity/wrap/gap/rewind handling, source and epoch changes, stale/no-telemetry timeouts, trend behavior, and gauge clamping. Those host tests complement but do not imply that every exceptional RFN1 state was deliberately forced during the 12-hour physical run.
 
 ## Current design conclusions
 
 - RFNAV discovery/focused scanning and TomiDock networking coexist stably.
-- The RFNAV-002 reset root cause remains closed as insufficient `sys_evt` stack; RFNAV-003 preserves the qualified 4608-byte effective event-task allocation and measured 1648-byte worst-case free margin.
-- RFNAV telemetry can be delivered directly from ESP `192.168.77.2` to Tomi `192.168.77.1` over CDC-ECM UDP without routing through the Wi-Fi LAN.
-- The sender is isolated from `sys_evt`; telemetry transport failures are nonfatal and subordinate to RFNAV/TomiDock control flow.
-- The 16-entry zero-wait queue and priority-1 sender task passed qualification with no queue drops or send errors while Tomi was present.
-- The Tomi-native GCC 3.3.4 receiver accepted a lossless 484-record sequence window with no gaps, rewinds, source changes, malformed records, or oversized records.
-- RFNAV-003 remains a telemetry transport milestone. `rfnav-rx` is diagnostic plumbing, not the final UI.
+- The RFNAV-002 reset root cause remains closed as insufficient `sys_evt` stack; the qualified RFNAV-003 ESP baseline remains unchanged beneath RFNAV-004.
+- RFNAV telemetry is delivered directly from ESP `192.168.77.2` to Tomi `192.168.77.1` over CDC-ECM UDP without routing the product path through the Wi-Fi LAN.
+- The sender remains isolated from `sys_evt`; telemetry transport failures are nonfatal and subordinate to RFNAV/TomiDock control flow.
+- RFNAV-003 proved the transport losslessly over a 484-record receiver window.
+- RFNAV-004 proves that Tomi can consume that stream directly as a practical live Nano-X field display.
+- `nxrfnav-v001` is the current qualified user-facing RFNAV application.
+- RSSI is treated as received signal strength, not physical distance.
+- The approximately 12-hour RFNAV-004 endurance result is strong operational evidence but remains an operator observation rather than an instrumented continuous log.
 
 ## Safety and operating constraints
 
@@ -215,11 +243,14 @@ Completed:
 - **RFNAV-002:** prove discovery -> deterministic target selection -> repeated focused RSSI sampling while TomiDock remains operational.
 - **RFNAV-002.1:** instrument and identify the unsolicited reset as `sys_evt` stack overflow.
 - **RFNAV-002.2:** increase and instrument `sys_evt` stack; pass standalone and full-stack physical qualification.
-- **RFNAV-003:** establish and physically qualify direct Tomi-facing RFN1 telemetry over the existing ECM link, including a Tomi-native receiver.
+- **RFNAV-003:** establish and physically qualify direct Tomi-facing RFN1 telemetry over the existing ECM link, including a Tomi-native diagnostic receiver.
+- **RFNAV-004:** build and physically qualify the first Tomi-native live RF signal display, including extended approximately 12-hour continuous operation.
 
 Next planned stage:
 
-- **RFNAV-004:** consume the qualified RFN1 stream on Tomi as a real user-facing live signal display. Keep the first 004 milestone intentionally small: current target identity/state, channel, RSSI, and obvious signal-strength trend/status. GPS correlation, directional navigation, mapping, persistence, BLE, and richer target-selection workflows remain later stages unless separately adjudicated into scope.
+- **RFNAV-005:** scope is not yet adjudicated. The leading product directions are richer operator target-selection workflow and GPS correlation/navigation context. Choose the next milestone explicitly before implementation rather than combining both by default.
+
+Later work may also add mapping, persistence, and BLE discovery/tracking. Those are not RFNAV-004 claims.
 
 ## Provenance
 
@@ -255,13 +286,6 @@ Primary source/build evidence:
 /mnt/d/Codex/TT3/rfnav-003-telemetry-20260926/
 ```
 
-Reviewed source/build package supplied for independent review:
-
-```text
-rfnav-003-telemetry-20260926.tar
-SHA-256 0b125f5cf0c85e59410ba6bb9d77d12dc5b17a53296d381aa2b2840152a8e33b
-```
-
 Qualified ESP application:
 
 ```text
@@ -279,7 +303,7 @@ size 6512 bytes
 SHA-256 f55ee0c5c73a36df570d51ed8bf290f84b0547fc42204bb77d3442109f348ef6
 ```
 
-Physical qualification log identities supplied for adjudication:
+Physical qualification log identities:
 
 ```text
 rfnav-003-fullstack-udp.log
@@ -292,4 +316,44 @@ rfnav-v003-rx.log
 SHA-256 c8137a7d1a121892f3e82d0eb35c568cfc0cb3bed4a9e0ce564f66bc7cb82292
 ```
 
-Raw logs remain evidence artifacts rather than Git documentation. Retain them in the established Codex evidence warehouse. This canonical document records byte identities and adjudicated durable conclusions without reproducing private RF identifiers.
+### RFNAV-004
+
+Primary source/build evidence:
+
+```text
+/mnt/d/Codex/TT3/rfnav-004-tomi-ui-20260926/
+```
+
+Corrected reviewed source identities:
+
+```text
+nxrfnav.c
+SHA-256 5036c630b932bf915d955b78fe9639c942354ccad176f7fdc9092b691681da49
+
+rfnav_model.c
+SHA-256 c2ad0ddc42ae65483a8554f1ea8907e2485de98a576a4e392797f4e13401c0e0
+
+rfnav_model.h
+SHA-256 21e8f8297099f832c35c611641719d0b7b3de64f0911d724b456a44199656a7d
+
+build-on-macbook.sh
+SHA-256 a7d9ce987b268952c54c779dd754f45da3052698a35c5132744885d56ea3be23
+```
+
+Qualified target UI:
+
+```text
+nxrfnav-v001
+size 13708 bytes
+SHA-256 a7947016ae034199dcbab1240635f503cf2f003226c04e19ca0ccabda90ef365
+```
+
+Corrected RFNAV-004 evidence package supplied for independent review:
+
+```text
+SHA-256 104065668d53909f19b26b0baee52fb6f943b12631f85773a0e501213eaa6dba
+```
+
+The physical UI smoke test is supported by the operator-supplied live-screen photograph. The approximately 12-hour endurance result is operator-reported and is intentionally recorded as such rather than represented as a continuous instrumented log.
+
+Raw logs and experiment artifacts remain evidence rather than Git documentation. Retain them in the established Codex evidence warehouse. This canonical document records byte identities and adjudicated durable conclusions without reproducing private RF identifiers.
