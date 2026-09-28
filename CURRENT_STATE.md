@@ -2,17 +2,19 @@
 
 ## Current focus
 
-The primary device is TT3 “Tomi,” with TomiDock providing its current USB/network connection. Active development is **RFNAV**, the RF signal-navigator project built on Tomi + TomiDock. **RFNAV-005 remains the current physically qualified RF tracking/control baseline. RFNAV-006 is now the active production-design stage**, explicitly scoped as GPS-correlated directional RF navigation with offline regional map context. The dedicated map feasibility spike passed on physical Tomi: regional `.rfmap` packages render correctly, internal cell boundaries are visually invisible, memory remains bounded, coverage-edge behavior is graceful, repeated relaunch is stable, and map rendering coexists cleanly with RFNAV-005 and TomiDock networking. The current feasibility 80 m/px LOD is intentionally rejected for production because it is both too slow and too visually dense. Routine USB detach-anomaly cycling remains retired.
+The primary device is TT3 “Tomi,” with TomiDock providing its current USB/network connection. Active development is **RFNAV**, the RF signal-navigator project built on Tomi + TomiDock. **RFNAV-005 remains the current physically qualified RF tracking/control baseline. RFNAV-006 is the production-design stage**, explicitly scoped as GPS-correlated directional RF navigation with offline regional map context. The map feasibility spike passed on physical Tomi, and the current GPS state-provider contract plus stationary-jitter behavior have now been physically characterized. A first moving capture yielded useful motion/no-fix evidence but was mechanically confounded because the hand-built TomiDock rig lost a soldered wire on its first intentional movement. The rig is therefore intentionally shelved pending mechanical repair/strain relief; RFNAV-006 design findings are preserved and do not need to be rediscovered. Routine USB detach-anomaly cycling remains retired.
 
 ## Stable operational baseline
 
-- **TomiDock is operational.** Tomi is the USB host; the ESP32-S3 is the CDC-ECM device and Wi-Fi routing endpoint. GPIO4 is unconnected and has no runtime VBUS/session role. Normal ECM, routing/NAPT, and TCP/2323 forwarding remain qualified.
+- **TomiDock is operational on the bench.** Tomi is the USB host; the ESP32-S3 is the CDC-ECM device and Wi-Fi routing endpoint. GPIO4 is unconnected and has no runtime VBUS/session role. Normal ECM, routing/NAPT, and TCP/2323 forwarding remain qualified.
+- **The current hand-built TomiDock rig is not mechanically qualified for mobile use.** The first intentional walking/movement attempt caused a soldered wire to detach. Bench-stable software/network/power results remain valid, but the physical rig is shelved pending repair and strain relief.
 - **RFNAV-005 is the qualified RFNAV baseline.** It retains RFN1 target telemetry on UDP/5515 and adds Tomi-to-ESP RFC1 commands on UDP/5516 plus ESP-to-Tomi RFD1/RFA1 replies on UDP/5517.
 - **Qualified ESP application:** 818,848 bytes, SHA-256 `1d8d1bce5e30f0f3ccc5ef8f0e03df1372bbe69729f1b46d8d35cfcadec83a09`.
 - **Qualified Tomi UI:** `/mnt/sdcard/opentom/rfnav/ui/nxrfnav-v002`, 20,148 bytes, SHA-256 `865cf76ddbe11ea1a383eea0ef107f23fbe85399d92933257317f28fbc680ba2`, built with `arm-linux-gcc (GCC) 3.3.4` against Nano-X.
 - **Qualified merged launcher:** `/mnt/sdcard/opentom/thomas/etc/nxlaunch.cnf`, 217 bytes, SHA-256 `54651633d90457e55425ac43ffe9b8ac6f892d2e79fad823937027ed972d6057`; the RFNAV entry launches the qualified UI without replacing the existing GPS entry.
 - **The Tomi diagnostic receiver remains available.** `/mnt/sdcard/opentom/rfnav/bin/rfnav-rx` is 6,512 bytes, SHA-256 `f55ee0c5c73a36df570d51ed8bf290f84b0547fc42204bb77d3442109f348ef6`. It is diagnostic plumbing, not the normal user-facing RFNAV consumer.
 - **Offline regional mapping is physically viable.** The feasibility renderer and Houston `.rfmap` packages passed real-device rendering, cell-boundary, memory/relaunch, coverage-edge, and RFNAV/TomiDock coexistence tests. The spike renderer is not itself the production RFNAV-006 UI.
+- **The current GPS application-facing source is `/var/run/ttgps.state`.** RFNAV must consume that read-only state file rather than opening `/var/run/gpspipe`, `/dev/gpsdata`, or `/dev/ttySAC1`.
 - **Routine file movement is documented.** Use the established workflow in the [Tomi File Transfer runbook](docs/runbooks/tomi-file-transfer.md); do not substitute bare SCP as the Tomi-to-MacBook method.
 - **Tomi runtime constraints are recorded** in the [Tomi Runtime ABI](docs/reference/tomi-runtime-abi.md), including the canonical OpenTom reboot helper rather than the inert BusyBox reboot applet.
 - **Build and machine roles are recorded** in the [Lab Environment reference](docs/environment/lab-environment.md).
@@ -35,11 +37,21 @@ The exact cause of the original pre-repair physical timeout remains unresolved b
 
 RFNAV-005 physical qualification deliberately included ESP startup before Tomi/ECM availability, real multi-page DISCOVER, RESCAN, PREV/NEXT, two non-associated target selections, live TRACK behavior, Change Target, CLOSE, relaunch and a second full examination, duplicate-instance rejection, UDP/5515 cleanup, and one bounded ECM loss/recovery cycle. Instrumented capture showed control `ready=1` before the cycle, `waiting_for_ecm` and `ready=0` during the real ECM-unready interval, then `ready local=192.168.77.2:5516`, a new ECM generation, restored routing/NAPT/TCP2323, and successful post-recovery manual discovery. Associated-uplink AP selection was intentionally not exercised and is outside the RFNAV-005 qualification claim.
 
-RFNAV-006 scope is now adjudicated. It will correlate actual RFN1 `OBS` samples with Tomi GPS state and movement to provide a north-up Signal Rose plus a stability-qualified best-observed signal area. Signal-Rose sectors are historical movement directions associated with improving signal, not claimed transmitter bearings. GPS loss must be nonblocking so ordinary RFNAV-005 tracking remains useful. Initial target changes reset the geographic session; persistence is deferred.
+RFNAV-006 scope is adjudicated. It will correlate actual RFN1 `OBS` samples with Tomi GPS state and movement to provide a north-up Signal Rose plus a stability-qualified best-observed signal area. Signal-Rose sectors are historical movement directions associated with improving signal, not claimed transmitter bearings. GPS loss must be nonblocking so ordinary RFNAV-005 tracking remains useful. Initial target changes reset the geographic session; persistence is deferred.
 
 The RFNAV-006 map feasibility spike physically proved the regional offline map direction. Rich 5 m/px first-visible rendering was under 2 seconds by operator observation; the renderer reported 1.623722 s initial base-frame submission. Sparse 5 m/px rendered in 0.569384 s and looked very similar, perhaps cleaner. Rich and sparse 20 m/px were approximately 2.19 s and 2.02 s. Both feasibility 80 m/px views were approximately 10.7–10.9 s and visually over-dense because they still carried roughly 52k–53k points across 55 cells. The production 80 m/px view is therefore an orientation layer, not a compressed street atlas: retain highways/freeways, major arterials, significant water and major place/district context while removing most local-road geometry.
 
 The map qualification also established visually seamless 4 km cell crossings, normal exact-boundary rendering, bounded renderer RSS, clean repeated CLOSE/relaunch behavior, graceful partial-map coverage-edge behavior with no network fallback, and clean coexistence with RFNAV-005 and TomiDock ECM traffic. Final cleanup left neither map nor RFNAV process running and the installed RFNAV UI still matched its qualified hash. The run was conducted while the rig was operating from a USB battery bank after an approximately one-hour functional soak; this is a field-prototype observation, not an electrical-current or capacity qualification.
+
+#### RFNAV-006 GPS state and motion characterization
+
+The live GPS path was re-verified on 2026-09-28 as `glgps -> /var/run/gpspipe -> ttgpsd -> /var/run/ttgps.state` plus satellite/raw outputs. `gpspipe` and `glgpsctrl` are named pipes and are not RFNAV application interfaces. The state file publishes provider health/freshness, fix validity, position, speed/course, dilution, satellite counts and UTC in coherent schema-version-1 snapshots. Across both captured runs the state publication rate was approximately 1.666 Hz, with accepted live-fix write-to-last-sentence age never exceeding 1.03 seconds; a two-second stale threshold is the current conservative application candidate.
+
+The clean stationary run contained 300/300 valid fixes over 340.37 seconds. `speed_mps` was exactly 0.000 in all 300 snapshots while the reported coordinates still drifted: the maximum adjacent step was 0.73 m, first-to-last displacement was 16.75 m, and maximum separation between any two stationary positions reached 29.59 m. `course_true_deg` remained fixed at 203.5° throughout. This closes displacement-only motion detection as invalid and establishes that course must not drive Signal-Rose direction while stationary.
+
+The first moving capture is useful but not a clean qualification because the physical TomiDock rig suffered a soldered-wire failure during the attempt. The provider itself stayed alive/stream-open with clean parser counters for the 339.79-second file, but only 146/300 snapshots had valid navigation/position/fix. Valid-fix runs were samples 38-40 and 64-206; samples 1-37, 41-63 and 207-300 were no-fix. Among valid snapshots, 82 reported positive speed; positive walking speeds ranged 0.309-0.926 m/s with median 0.720 m/s. This supports approximately 0.30 m/s sustained across multiple fresh GPS-quality updates as an initial movement-start candidate, but exact hysteresis/stop constants remain provisional until the rig is mechanically repaired and a clean moving test is repeated.
+
+Production GPS rules are now preserved in [Tomi GPS and `glgps` Reference](docs/reference/tomi-gps-glgps.md): consume `/var/run/ttgps.state`; separate provider-alive/no-fix from provider failure; pause geographic scoring on invalid fix while leaving RFNAV-005 tracking operational; use reported speed as the primary motion gate; derive movement bearing from accepted geographic displacement only after motion is established; do not use `course_true_deg` while stationary; and initially exclude `fix_quality_name=estimated` from directional-scoring evidence.
 
 See [RF Navigator](docs/architecture/rfnav.md) for protocol, UI behavior, RFNAV-006 product design, map qualification details, evidence identities, and limits.
 
@@ -57,7 +69,7 @@ The Phase 4F reduced observer remains diagnostic-only, not production architectu
 
 ## Closed decisions
 
-- **RFNAV-005 is physically qualified and remains the active RF tracking/control baseline. RFNAV-006 is the active production-design stage, not yet a replacement qualification.**
+- **RFNAV-005 is physically qualified and remains the active RF tracking/control baseline. RFNAV-006 remains production design, not yet a replacement qualification.**
 - `nxrfnav-v002` is the qualified normal user-facing RFNAV consumer; `rfnav-rx` remains diagnostic-only.
 - RFNAV-003 RFN1 telemetry remains the tracking transport beneath RFNAV-005; RFNAV-005 adds the separate RFC1/RFD1/RFA1 control/reply plane rather than replacing RFN1.
 - RFNAV-002's unsolicited reset root cause is closed as `sys_evt` stack exhaustion under the targeted-scan workload. Keep the configured event-task stack at 4096 bytes unless a later measured workload justifies change.
@@ -70,7 +82,11 @@ The Phase 4F reduced observer remains diagnostic-only, not production architectu
 - RSSI is a received-signal-strength indicator, not a distance measurement or direct transmitter bearing.
 - **Offline regional vector mapping is physically viable on Tomi.** Use the proven indexed regional-package/cell/cache architecture as the production starting point rather than restarting map-architecture discovery.
 - **The 80 m/px production view is city-orientation context.** It should intentionally discard most local-road geometry; the feasibility package's over-dense approximately 52k-point wide view is not a production target.
-- GPS correlation must consume actual RF observations and read the established Tomi GPS state-provider path rather than competing for the GPS UART/FIFO.
+- GPS correlation consumes actual RF observations and reads `/var/run/ttgps.state`; do not compete for the GPS UART/FIFO.
+- Displacement-only movement detection is rejected. Bench-stationary GPS drift reached nearly 30 m across the run while reported speed remained zero.
+- `course_true_deg` is not a stationary movement-direction source. Use speed as the primary motion gate and derive movement direction from accepted position displacement after motion is established.
+- Approximately 0.30 m/s sustained across multiple fresh GPS-quality updates is the current evidence-based movement-start candidate, not a final universal threshold.
+- GPS provider-alive/no-fix is a normal nonblocking RFNAV state: geographic scoring pauses, ordinary RFNAV-005 tracking remains usable.
 - GPIO4 remains removed/unconnected and has no RFNAV role.
 - Role-aware Tomi boot integration already exists. Do not revive a proposed boot-integration v002.
 - Never issue `echo host > /sys/devices/platform/tomtomgo-usbmode/mode`; prior use caused rc=139/kernel Oops behavior.
@@ -78,7 +94,8 @@ The Phase 4F reduced observer remains diagnostic-only, not production architectu
 
 ## Open / next work
 
-- **RFNAV-006 production design is active.** First verify the live Tomi GPS state-provider schema and measure stationary/moving GPS jitter before freezing geographic scoring thresholds.
+- **The current hand-built TomiDock rig is shelved pending mechanical repair/strain relief.** Do not resume walking/mobile qualification until the detached soldered interconnect is repaired and the wiring is mechanically secured.
+- RFNAV-006 production design may continue off-bench from the preserved map/GPS evidence. A later repaired-rig run should repeat the moving GPS characterization before freezing motion hysteresis/stop constants or claiming field qualification.
 - Productionize the three map LOD policies. The 5 m/px view may retain useful local detail; 20 m/px should emphasize neighborhood/district structure; 80 m/px should be aggressively simplified to city-orientation features.
 - Integrate GPS/RFN1 OBS correlation, Signal Rose, breadcrumb/path context and the stability-qualified best-observed signal area while keeping GPS loss nonblocking.
 - Regional packages should support multiple installed metros, package overlap/halo, and no network requirement for ordinary movement inside a loaded metro. Internet access is acceptable for deliberate package acquisition/replacement.
@@ -91,8 +108,9 @@ The Phase 4F reduced observer remains diagnostic-only, not production architectu
 ## Canonical map
 
 - [TT3 “Tomi” device profile](docs/devices/tt3-tomi.md) — device identity and stable hardware facts.
-- [TomiDock Architecture](docs/architecture/tomidock.md) — physical/USB/network design, lifecycle, and safety constraints.
+- [TomiDock Architecture](docs/architecture/tomidock.md) — physical/USB/network design, portable-power observation, mechanical field limit, lifecycle, and safety constraints.
 - [RF Navigator](docs/architecture/rfnav.md) — RFNAV behavior, protocols, UI, RFNAV-006 production design, map qualification state, evidence identities, and staged development.
+- [Tomi GPS and `glgps`](docs/reference/tomi-gps-glgps.md) — GPS stack, current `ttgpsd` state-provider contract, stationary/moving characterization, and RFNAV-006 motion-gating rules.
 - [Tomi Runtime ABI](docs/reference/tomi-runtime-abi.md) — Tomi commands and compatibility.
 - [Tomi File Transfer](docs/runbooks/tomi-file-transfer.md) — current transfer procedures.
 - [Lab Environment](docs/environment/lab-environment.md) — machine roles, source/build paths, and command contexts.
