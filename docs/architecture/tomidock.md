@@ -41,6 +41,19 @@ External GPIO4/BVALID monitor:    not used
 
 Normal ESP boot, enumeration as `303a:4002`, CDC-ECM, Wi-Fi/routing/NAPT, and TCP/2323 forwarding passed the post-removal smoke test. The physical jumper-removal result closes GPIO4 necessity for this current normal topology. It does not prove deterministic physical-detach fail-close behavior, explain historical lifecycle anomalies, or establish formal USB electrical compliance.
 
+### Portable-power and mechanical field-rig status
+
+The current hand-built rig can operate from a USB battery bank through its existing miniUSB power input without redesign. During RFNAV-006 map qualification the battery bank had already completed an approximately one-hour functional soak without sleeping or disrupting Tomi/TomiDock operation, and the map renderer, GPS, RFNAV-005, Telnet/ECM and TomiDock networking all operated normally on that portable supply. This is a functional field-prototype power observation, not a current/charge-rate, runtime-capacity, or USB electrical-compliance qualification.
+
+The same rig is **not mechanically qualified for mobile use**. On 2026-09-28, the first intentional attempt to move the complete Tomi/TomiDock/battery assembly for a walking GPS capture caused a soldered wire in the hand-built rig to break free. The exact conductor, joint failure mechanism and electrical consequence were not further characterized before the rig was shelved. No causal claim should be made between that wire failure and the GPS fix-loss intervals present in the simultaneously collected log.
+
+This separates two conclusions that must not be conflated:
+
+- stationary/bench operation and portable battery power have been strongly demonstrated functionally;
+- physical robustness while being carried or walked has **failed its first real test** and remains unqualified.
+
+The rig is intentionally shelved pending mechanical rework. Future field use should begin with repairing/strain-relieving the physical interconnects and then repeating a bounded movement test; software/map/RFNAV bench results do not need to be re-proven merely because the hand-built wiring failed mechanically.
+
 ## USB architecture and lifecycle
 
 Tomi operates as the USB host. The ESP32-S3 operates as the native USB CDC-ECM device and has been observed by Tomi as VID:PID `303a:4002`, product string `TomiDock CDC ECM v001`. The intended ESP startup explicitly connects the device after successful TinyUSB driver installation; the no-external-monitor configuration does not consume GPIO4 as BVALID/VBUS input.
@@ -93,6 +106,8 @@ The preserved v001.5.3 archive internally verifies: all six payload files match 
 - Routing readiness follows USB lifecycle state and fails closed on observed suspend; historical intermittent lifecycle findings remain a separate limitation.
 - LAN access to Tomi's shell is the explicit TCP/2323-to-TCP/23 mapping, not a general inbound forwarding promise.
 - Tomi boot integration is role-aware; do not add a new boot integration merely because older proposals predate the live setup.
+- The existing USB battery-bank power path is adequate for bench/field-prototype functional work; do not confuse that with capacity or electrical qualification.
+- The current hand-built rig is not field-mechanically qualified. Mechanical packaging, strain relief and repaired soldered interconnects are prerequisites for another walking/mobile qualification attempt.
 
 ## Safety constraints
 
@@ -113,6 +128,8 @@ Do not equate a source tree, disposable build, or diagnostic image with the curr
 - The evidence establishes the explicit TCP/2323 inbound mapping; broader configurable or transparent LAN-to-ECM TCP ingress policy is not established.
 - The built `WIFI_PS_NONE` candidate remains unflashed and has no measured latency benefit; the exact currently installed ESP image is not hash-bound.
 - The powered-S3 `/etc/rc` gadget-wait mechanism is source-supported but not a bench-proven current failure; current role-aware startup is operator-reported.
+- Portable battery operation is functionally proven for the current bench workload, but runtime capacity/current draw remain unmeasured.
+- The hand-built field rig failed mechanically on its first intentional movement when a soldered wire detached; field-mobile robustness is unqualified until repaired and strain-relieved.
 
 ## Canonical references
 
@@ -124,3 +141,5 @@ Do not equate a source tree, disposable build, or diagnostic image with the curr
 ## Provenance
 
 The physical GPIO4 removal and smoke result are recorded in `/mnt/d/Codex/TT3/20_GPIO4_JUMPER_REMOVAL_AND_DESIGN_CLOSEOUT_2026-09-24.md`; lifecycle adjudications are in `/mnt/d/Codex/TT3/tomidock-gpio4-bvalid-audit-20260921/`. The BVALID source audit, Wi-Fi candidate, and powered-S3 synthesis are in their respective `/mnt/d/Codex/TT3/` and `/mnt/d/Codex/PPP-investigation/` work units. The inbound-TCP bench finding and built-only boot-host candidate are in `/mnt/d/Codex/PPP-investigation/tomidock-boot-host-v001/REPORT.md`. Full owner selection and remaining evidence boundaries for this maintenance pass are in `/mnt/d/Codex/TT3/luce-tomidock-usb-lifecycle-coverage-fix-2026-09-25.md`.
+
+The 2026-09-28 portable-power and movement result was observed during the RFNAV-006 map/GPS work. The software/GPS capture identities and motion-classification conclusions are owned by [Tomi GPS and `glgps` Reference](../reference/tomi-gps-glgps.md); this page owns the durable TomiDock mechanical conclusion that the current hand-built rig is bench-stable but not yet field-mobile qualified.
