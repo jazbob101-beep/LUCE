@@ -4,7 +4,7 @@
 
 RFNAV repurposes TT3 “Tomi” and TomiDock as a geographically aware RF signal navigator. Tomi provides GPS, touchscreen, Linux, and battery operation; the ESP32-S3 in TomiDock provides Wi-Fi/BLE radio capability. The intended product direction is to discover authorized nearby transmitters, select a target, measure signal strength repeatedly, and correlate that telemetry with Tomi-side state so Tomi can eventually help navigate toward a signal source.
 
-This document is the canonical owner for RFNAV behavior, qualification state, protocol, UI behavior, and staged development. TomiDock USB/network architecture, lifecycle behavior, and electrical safety remain owned by [TomiDock Architecture](tomidock.md).
+This document is the canonical owner for RFNAV behavior, qualification state, protocol, UI behavior, mapping/navigation context, and staged development. TomiDock USB/network architecture, lifecycle behavior, and electrical safety remain owned by [TomiDock Architecture](tomidock.md).
 
 ## Current qualified baseline
 
@@ -314,9 +314,91 @@ The instrumented recovery capture showed the intended lifecycle explicitly: RFNA
 
 Associated-uplink AP selection was intentionally **not** exercised during this qualification. The discovery representation includes the associated AP, but selecting the currently associated uplink remains an unqualified edge case and is not part of the RFNAV-005 PASS claim.
 
+## RFNAV-006 adjudicated scope and production design
+
+RFNAV-006 is now explicitly scoped as **GPS-correlated directional RF navigation with offline regional map context**. The goal is not to claim a transmitter bearing from RSSI. It is to combine repeated RF observations with Tomi's movement and location history so the operator can see which movement directions and visited areas have correlated with stronger signal.
+
+The product model is:
+
+- a north-up **Signal Rose** whose warm sectors represent movement directions that historically correlated with improving signal, not a measured bearing to the transmitter;
+- a stability-qualified **best observed signal patch/area**, not a point estimate of transmitter location;
+- ordinary RFNAV-005 tracking remains usable when GPS is unavailable or stale;
+- geographic scoring consumes actual RFN1 `OBS` samples only; cached DISCOVER/SELECT RSSI is not geographic evidence;
+- target change resets the active geographic session initially; cross-session persistence is deferred until separately designed;
+- RFNAV reads the existing Tomi GPS state-provider output rather than competing for the GPS UART/FIFO. The exact live provider schema and stationary/moving jitter envelope must be physically verified before production scoring constants are frozen.
+
+Maps are **context, not routing**. RFNAV-006 does not attempt turn-by-turn navigation.
+
+### Regional offline package model
+
+The production direction is regional offline packages such as `houston.rfmap` and `austin.rfmap`. Multiple packages may coexist on Tomi. Internet access is acceptable when deliberately obtaining or replacing a regional package, but ordinary movement within a metro area must not require network access. Internal cells remain an implementation detail and must stay invisible to the operator. Adjacent regional packages should include sufficient overlap/halo to avoid brittle edge behavior.
+
+The physically tested package architecture used 4 km indexed cells, three LODs, local integer geometry, host-side preprocessing/triangulation, bounded cell loading, and a roughly 1 MiB geometry-cache ceiling. That architecture is accepted as the starting production design because the physical spike demonstrated correct rendering, bounded memory behavior, invisible cell transitions, graceful coverage-edge behavior, and clean coexistence with RFNAV/TomiDock.
+
+### Production LOD intent
+
+The three map scales have different jobs and should not carry the same feature density:
+
+- **5 m/px:** local/street-level context. Local roads are useful here.
+- **20 m/px:** neighborhood/district context. Prefer collectors, arterials, significant local structure, water, and useful labels over exhaustive street density.
+- **80 m/px:** city-orientation context: “what part of town am I in?” This scale should emphasize freeways/highways, major arterials, significant water and major place/district context. Most local-road geometry should be omitted.
+
+The feasibility package's 80 m/px LOD is rejected as a production feature set. It rendered roughly 52,000 points across 55 cells and was both approximately 10.7–10.9 seconds per redraw and visually over-dense to the point of poor usability. Production work should reduce wide-view geometry aggressively, with an initial target on the order of removing roughly 80% of the currently visible road detail, then validate readability and redraw latency on Tomi. The objective is not to optimize drawing unwanted roads faster; it is to stop drawing them.
+
+## RFNAV map feasibility spike and physical qualification
+
+A dedicated feasibility work unit at `/mnt/d/Codex/TT3/rfnav-map-feasibility-20260927/` evaluated whether Tomi can support an offline regional vector-map layer without depending on the proprietary TomTom renderer. Host work produced an OSM-derived `.rfmap` package format, sparse and rich Houston packages, a Nano-X target renderer, previews, bounded loader/cache behavior, and a physical qualification plan.
+
+Frozen deployed artifacts:
+
+```text
+nxrfmap-spike
+size: 24356 bytes
+SHA-256: 3ac5d68f405b47a0078932ce4f6581666f8d1b1f31628eb30edf81259c085b81
+
+houston-sparse.rfmap
+size: 17133968 bytes
+SHA-256: a5225c3789ae6b277c5aad3750908729c664607072befc3878f6d1c1b16539cf
+
+houston-rich.rfmap
+size: 38787714 bytes
+SHA-256: 802e38b044cbcbd8ab42256561a1145b2b998f0342c3ba2f1a6a3525a7752a9f
+
+NOTICE.txt
+SHA-256: 65e9112c1d4e10339edc5a794dcc3a53e014186d57a8980a02baa625dfee26cb
+```
+
+The physical run on 2026-09-27/28 established:
+
+- rich Houston 5 m/px first-visible map in under 2 seconds by operator observation; renderer diagnostics reported package open `0.264510 s`, initial base-frame submission `1.623722 s`, and first overlay submission `0.057496 s`;
+- the 5 m/px rich view was recognizable and period-appropriate on the real 480x272 display, with roads, water, readable major labels, synthetic overlays, attribution and no visible corruption;
+- overlay-only updates were normally about 36–40 ms and did not force repeated base-map redraws;
+- renderer process RSS was only 868 kB in the initial open state. After wider interaction it was 1,652 kB; after the tenth relaunch at 20 m/px it was 824 kB. The low `MemFree` values observed while maps were active tracked a large reclaimable filesystem page cache rather than runaway renderer RSS;
+- repeated CLOSE/relaunch operation completed cleanly, final CLOSE removed the process, and memory recovered without evidence of a leak;
+- 4 km internal cell crossings were visually undetectable. An exact known cell-boundary center also rendered normally with no missing geometry, flicker or glitching;
+- the coverage-edge test produced a partial map plus `COVERAGE EDGE: no network fallback`, remained responsive, and did not crash;
+- RFNAV-005 and the map renderer coexisted cleanly. DISCOVER/TRACK/Change Target/CLOSE behaved normally while the map remained open; TomiDock ECM ping remained 5/5 with 0% loss, and closing RFNAV left the map process alive as intended;
+- final cleanup left neither map nor RFNAV process running; final TomiDock ping was 5/5 with 0% loss at 2.389 ms average, and the installed RFNAV UI still matched qualified SHA-256 `865cf76ddbe11ea1a383eea0ef107f23fbe85399d92933257317f28fbc680ba2`;
+- the entire map qualification occurred while the TomiDock rig was operating from a USB battery bank that had already completed an approximately one-hour functional soak without sleeping or disrupting Tomi/TomiDock operation. This is a field-prototype power observation, not an electrical-current or energy-capacity qualification.
+
+### Measured LOD behavior
+
+The physical renderer timing showed a clear feature-density boundary:
+
+```text
+                 rich                 sparse
+5 m/px      1.623722 s           0.569384 s
+20 m/px     2.194572 s           2.022638 s
+80 m/px    10.893992 s          10.733431 s
+```
+
+At 5 m/px, sparse reduced the sampled point count from 23,383 to 5,138 and was materially faster while the operator judged it visually very similar and perhaps cleaner. At 80 m/px, rich and sparse still carried about 53,065 and 52,089 points respectively across 55 cells, so both remained approximately 10.7–10.9 seconds and visually over-dense. The second rich 80 m/px redraw remained approximately 10.76 seconds despite only 8,320 bytes of new I/O, so storage/cache miss latency is not the primary wide-view bottleneck. The production fix is a much more aggressive wide-view LOD rather than a different package architecture.
+
+The feasibility question is therefore closed positively: **offline regional vector maps are physically viable on Tomi**. The map spike is not itself the RFNAV-006 production UI, and the current 80 m/px feature set is explicitly not production-qualified.
+
 ## Current design conclusions
 
-- **RFNAV-005 is the current physically qualified RFNAV baseline.**
+- **RFNAV-005 remains the current physically qualified RF tracking/control baseline.** RFNAV-006 is the active production-design stage built on that baseline, not a replacement qualification yet.
 - `nxrfnav-v002` is the current qualified user-facing RFNAV application.
 - RFNAV discovery, paged target selection, live tracking, target changes, close/relaunch, single-instance handling, and UDP/5515 cleanup all work on the physical Tomi/TomiDock system.
 - The RFNAV control plane recovers from a bounded real ECM loss/recovery cycle without permanently dying.
@@ -326,7 +408,9 @@ Associated-uplink AP selection was intentionally **not** exercised during this q
 - RFNAV telemetry remains direct UDP over ECM, ESP `192.168.77.2` to Tomi `192.168.77.1:5515`; the product path is not routed through the Wi-Fi LAN.
 - Control/discovery traffic remains direct over ECM on UDP/5516 and UDP/5517.
 - Socket/formatting work remains outside `sys_evt` / Wi-Fi callback context.
-- RSSI is received signal strength, not physical distance.
+- RSSI is received signal strength, not physical distance or a direct transmitter bearing.
+- Offline regional mapping is physically viable on Tomi; the proven package/cell/cache architecture is the production starting point.
+- Wide-area 80 m/px mapping is an orientation view and must intentionally omit most local-road geometry rather than preserving the feasibility package's over-dense LOD.
 
 ## Safety and operating constraints
 
@@ -347,12 +431,13 @@ Completed:
 - **RFNAV-003:** establish and physically qualify direct Tomi-facing RFN1 telemetry over the existing ECM link, including a Tomi-native diagnostic receiver.
 - **RFNAV-004:** build and physically qualify the first Tomi-native live RF signal display, including extended approximately 12-hour continuous operation.
 - **RFNAV-005:** add desktop product UX, nearby-AP discovery, paged touchscreen target selection, TRACK / Change Target workflow, robust RFC1/RFD1/RFA1 control/reply handling, and physically qualify startup ordering plus bounded ECM recovery.
+- **RFNAV-006 map feasibility spike:** prove that an OSM-derived offline regional vector package and Nano-X renderer are viable on physical Tomi, characterize LOD performance, memory, cell seams, coverage-edge behavior, relaunch stability and RFNAV/TomiDock coexistence.
 
-Next planned stage:
+Active production-design stage:
 
-- **RFNAV-006 scope is not yet adjudicated.** GPS correlation/navigation context is the leading product direction, but choose the milestone explicitly before implementation.
+- **RFNAV-006:** integrate physically verified Tomi GPS state with RFN1 OBS history, Signal Rose/best-area guidance and the proven regional offline map architecture. First implementation work should verify the live GPS state-provider schema and jitter envelope, productionize the three LOD policies, then integrate geographic RF scoring without weakening RFNAV-005 operation when GPS is absent.
 
-Later work may also add mapping, persistence, associated-uplink edge-case qualification, and BLE discovery/tracking. Those are not RFNAV-005 claims.
+Later work may add geographic-session persistence, associated-uplink edge-case qualification, and BLE discovery/tracking. Those are not RFNAV-005 or current RFNAV-006 feasibility claims.
 
 ## Provenance
 
@@ -509,5 +594,15 @@ SHA-256 f964b6491cfa49c9eda954c30346765d1490bc41fb135506eebd9a197bf6f3f5
 ```
 
 The preserved capture directly records healthy control traffic, successful manual discoveries, a real ECM unready interval, control-plane transition to `ready=0`, later `ready local=192.168.77.2:5516`, ECM/routing recovery in a new generation, and successful post-recovery manual discovery. Touch usability, two non-associated target selections, CLOSE/relaunch, duplicate-instance rejection, and UDP/5515 cleanup are operator-observed physical results.
+
+### RFNAV-006 map feasibility
+
+Primary feasibility/build evidence:
+
+```text
+/mnt/d/Codex/TT3/rfnav-map-feasibility-20260927/
+```
+
+The work unit contains the package-format definition, host generation/preview evidence, Tomi renderer source/build evidence, package results, commands and the physical test plan. Physical qualification results were then obtained on the real Tomi/TomiDock system using the frozen artifact identities recorded above. The current production conclusion is the adjudicated result of that host work plus the physical run: regional offline vector mapping is viable, while the feasibility 80 m/px LOD is intentionally rejected for production because it is both too slow and too visually dense.
 
 Raw logs and experiment artifacts remain evidence rather than Git documentation. Retain them in the established Codex evidence warehouse. This canonical document records byte identities and adjudicated durable conclusions without reproducing private RF identifiers.
