@@ -2,12 +2,12 @@
 
 ## Scope
 
-This reference consolidates what the preserved Tomi evidence establishes about the GPS software stack, its Linux-facing interfaces, observed runtime, and the limits of identifying the physical receiver. It is not a GPS hardware teardown or a claim that any historical filesystem or OpenTom source tree exactly matches the current installed device.
+This reference consolidates what the preserved Tomi evidence establishes about the GPS software stack, its Linux-facing interfaces, observed runtime, the current custom `ttgpsd` state-provider contract, and the limits of identifying the physical receiver. It is not a GPS hardware teardown or a claim that any historical filesystem or OpenTom source tree exactly matches the current installed device.
 
 Evidence labels used here:
 
 - **ESTABLISHED_TT3** — directly supported by Tomi-specific captured or live evidence.
-- **LIVE_OBSERVED** — present in the dated Aug. 24, 2026 Tomi terminal capture; that capture is a terminal transcript, not a raw UART trace.
+- **LIVE_OBSERVED** — directly observed in a dated Tomi terminal capture or state capture; each section states the date and provenance boundary.
 - **EXACT_BINARY** — static finding tied to the listed hash-identified executable.
 - **SOURCE_CORRELATED** — defined by the inspected Austin/type-42 OpenTom source, not proven to be the built or running kernel.
 - **PROTOCOL_CORRELATED** — format/output evidence from `glgps` or its downstream log, not proof of receiver silicon.
@@ -51,18 +51,98 @@ This establishes one **LIVE_OBSERVED custom-run topology**, not the default TomT
 ```text
 GPS receiver / serial endpoint (physical protocol not captured)
     ↕  S3C UART endpoint reported as /dev/ttySAC1
-    ↕  Aug. 24 symlink /dev/gpsdata -> /dev/ttySAC1
+    ↕  current symlink /dev/gpsdata -> /dev/ttySAC1
 glgps normal
     ├─ control/timestamp/platform interface: /dev/gps, /proc/barcelona
     ├─ GLL text output including NMEA sentences and $PGLOR extensions
-    ↓  /var/run/gpspipe (named FIFO in the custom run)
+    ↓  /var/run/gpspipe (named FIFO)
 ttgpsd (separate consumer)
-    └─ custom state/satellite/raw text files under /var/run
+    ├─ /var/run/ttgps.state
+    ├─ /var/run/ttgps.satellites
+    └─ /var/run/ttgps.raw (+ rotated ttgps.raw.1)
 ```
 
-The transcript directly observes the symlink, device nodes, process command lines, FIFO and output files. It does **not** capture raw bytes at the UART, so the arrows describe the observed software endpoint and downstream flow, not a byte-level proof of every receiver exchange. `/dev/gps` is a TomTom platform control/timestamp device, not the serial stream. `ttgpsd` was a custom separate consumer; no evidence here establishes that stock PNDNavigator consumed these custom output files.
+The Aug. 24 transcript directly observes the symlink, device nodes, process command lines, FIFO and output files. The 2026-09-28 RFNAV-006 characterization re-observed the same active topology on the live device and captured the current startup script and process command lines. It does **not** capture raw bytes at the UART, so the arrows describe the observed software endpoint and downstream flow, not a byte-level proof of every receiver exchange. `/dev/gps` is a TomTom platform control/timestamp device, not the serial stream. `ttgpsd` is a custom separate consumer; no evidence here establishes that stock PNDNavigator consumed these custom output files.
 
 The Aug. 24 capture reports 72,330 valid parsed sentences, with no checksum or malformed-sentence errors before shutdown. Its last ordinary RMC carried UTC date `240826` (2026-08-24) and a valid status. Exact coordinates are intentionally omitted. No raw UART capture, receiver binary-message dump, socket/TCP GPS interface, or independently confirmed baud/protocol negotiation is present. The historical `glconfig.xml` specifies port `/dev/gpsdata`, baud 115200, and `lto.dat`; that is extracted configuration, not proof of the exact live custom-run config contents or receiver-side wire settings.
+
+### Current `ttgpsd` state-provider contract — 2026-09-28
+
+The RFNAV-006 live inspection established the current script-level provider contract more precisely. `/mnt/sdcard/opentom/thomas/gps/start-gps.sh` removes and recreates `/var/run/gpspipe` as a named FIFO, starts `ttgpsd` with that FIFO as input, and writes the current state outputs to:
+
+```text
+/var/run/ttgps.state
+/var/run/ttgps.satellites
+/var/run/ttgps.raw
+/var/run/ttgps.raw.1   (rotation observed)
+```
+
+`/var/run/gpspipe` and `/var/run/glgpsctrl` were live named pipes. RFNAV and other downstream applications must **not** consume `/var/run/gpspipe` or compete for `/dev/ttySAC1`; doing so could steal or perturb the stream intended for `ttgpsd`. `/var/run/ttgps.state` is the accepted read-only application-facing state source for RFNAV-006.
+
+The state file is schema version 1 and exposes, in one coherent snapshot, provider health/freshness (`sequence`, `state_written_uptime_ms`, `last_sentence_uptime_ms`, `alive`, `stream_open`), fix validity (`navigation_valid`, `position_valid`, `fix_valid`, `fix_quality`, `fix_type`), position (`latitude_deg`, `longitude_deg`), motion (`speed_mps`, `course_true_deg`), dilution (`pdop`, `hdop`, `vdop`), satellite counts, and UTC fields. RFNAV does not need `/var/run/ttgps.satellites` for ordinary movement scoring.
+
+Across both 300-snapshot RFNAV-006 captures, state publication was approximately **1.666 Hz**. For accepted live-fix samples, `state_written_uptime_ms - last_sentence_uptime_ms` never exceeded **1.03 seconds**. A two-second freshness bound is therefore a conservative initial application threshold, not a receiver specification.
+
+The no-fix state remained explicit and machine-readable while the provider stayed alive: the moving capture repeatedly showed `alive=1` and `stream_open=1` with `navigation_valid=0`, `position_valid=0`, `fix_valid=0`, blank latitude and course, and continuing parser/state updates. This lets RFNAV distinguish **provider alive but no fix** from provider failure without reading the FIFO.
+
+### RFNAV-006 stationary characterization — 2026-09-28
+
+A 300-snapshot stationary capture was taken from `/var/run/ttgps.state` with Tomi physically stationary on the bench. The shell loop's file-dump overhead stretched the nominal 300-second run to **340.37 seconds** of provider uptime.
+
+Derived results from all 300 coherent state snapshots:
+
+| Measurement | Stationary result |
+|---|---:|
+| valid navigation / position / fix | 300 / 300 |
+| reported `speed_mps` | 0.000 in all 300 snapshots |
+| reported `course_true_deg` | 203.5° in all 300 snapshots |
+| provider sequence advance | 567 |
+| provider state-write rate | ~1.666 Hz |
+| checksum / malformed / parser-overrun deltas | 0 / 0 / 0 |
+| HDOP | 1.0 to 5.2; median 2.4 |
+| satellites used | 2 to 7; median 5 |
+| largest adjacent reported-position step | 0.73 m |
+| 95th-percentile adjacent step | 0.47 m |
+| first-to-last reported displacement | 16.75 m |
+| maximum separation between any two reported stationary positions | 29.59 m |
+
+The stationary trajectory was slow drift rather than large one-sample jumps. Maximum observed displacement over increasing baselines was approximately 2.04 m at 5 s, 3.59 m at 10 s, 6.06 m at 20 s, 7.94 m at 30 s, 12.89 m at 60 s, and 23.19 m at 120 s.
+
+Two durable conclusions follow. First, **displacement alone must not be treated as proof of motion**; a simple five-meter movement trigger would eventually manufacture movement while Tomi is stationary. Second, `course_true_deg` is not trustworthy as a movement direction while stationary: it remained fixed at 203.5° even while the reported coordinates drifted and `speed_mps` remained zero.
+
+### RFNAV-006 moving capture — useful but mechanically confounded
+
+A second 300-snapshot capture was attempted while moving the complete Tomi/TomiDock/battery assembly. The current hand-built rig suffered a mechanical failure during this first intentional movement: a soldered wire broke free. The GPS capture is therefore useful evidence but **not a clean field-qualification run**, and no causal claim is made between the wire failure and any GPS fix loss seen in the log.
+
+The capture still produced **339.79 seconds** of provider state and remained healthy at the parser/provider level for the whole file: `alive=1`, `stream_open=1`, no FIFO EOF/reopen, and no checksum, malformed-sentence, or parser-overrun increase. GPS-fix availability, however, was poor and intermittent:
+
+```text
+samples 1-37     no valid fix
+samples 38-40    valid fix
+samples 41-63    no valid fix
+samples 64-206   valid fix
+samples 207-300  no valid fix
+```
+
+Thus 146/300 snapshots had valid navigation/position/fix and 154/300 did not. The principal valid run, samples 64-206, lasted about 160 seconds. Within all valid snapshots, 82 reported positive speed and 64 reported zero speed. Positive reported walking speeds ranged from **0.309 to 0.926 m/s**, with median **0.720 m/s**. Of the 146 valid snapshots, 127 reported `fix_quality_name=gps` and 19 reported `fix_quality_name=estimated`; only 4 of the 82 positive-speed snapshots were `estimated`.
+
+This capture materially strengthens one classifier finding despite its mechanical limitation: the bench-stationary capture reported exactly `0.000 m/s` in all 300 snapshots, while positive-speed walking samples began at 0.309 m/s. An initial RFNAV movement-start candidate of approximately **0.30 m/s sustained across multiple fresh GPS-quality state updates** is therefore evidence-based. It is not yet a fully qualified universal threshold because the moving trial was mechanically compromised and sampled only one walking session.
+
+### RFNAV-006 GPS application contract carried forward
+
+The following rules are durable enough to bake into RFNAV-006 production design now:
+
+1. Read `/var/run/ttgps.state`; do not open `/var/run/gpspipe`, `/dev/gpsdata`, or `/dev/ttySAC1` from RFNAV.
+2. Treat `alive`/`stream_open` separately from navigation/fix validity. Provider-alive/no-fix is a normal state, not an application failure.
+3. Geographic RF scoring pauses when navigation/position/fix validity is false; ordinary RFNAV-005 signal tracking remains usable.
+4. Use the provider position as context, but never infer motion from accumulated coordinate displacement alone.
+5. Use reported speed as the primary motion gate. The current evidence supports `~0.30 m/s` sustained across multiple fresh GPS-quality updates as the initial movement-start candidate; exact hysteresis/stop constants remain provisional until a repaired field rig can repeat moving qualification.
+6. Derive Signal-Rose movement bearing from accepted geographic displacement after motion has been established. `course_true_deg` may corroborate movement later, but must not drive direction while stationary or no-fix.
+7. Do not use `fix_quality_name=estimated` as directional-scoring evidence in the initial production implementation. It may still be displayed as degraded position context.
+8. A state age of two seconds is a conservative initial stale threshold based on the observed ~1.666 Hz provider and <=1.03 s write-to-last-sentence lag; this is an application policy, not a receiver guarantee.
+9. Do not hard-code a satellite-count or HDOP cutoff from these two captures alone. Retain those fields for confidence/diagnostic use and gather a clean repeated moving run before promoting a stricter quality gate.
+
+These rules close the state-provider architecture question and the stationary false-motion question. They do **not** constitute full RFNAV-006 field qualification.
 
 ### Shutdown behavior from the later binary
 
@@ -110,18 +190,34 @@ The captured filesystem includes `ephem/ee_meta.txt` with `Expiry=1329067832`, a
 - No live MMIO validation of the Austin source-profile GPS reset/power mappings.
 - No demonstrated GPS consumer relationship from the custom `ttgpsd` output files to stock navigation software.
 - No proven causal link between the rapid time-sync loop and `FIN,1`.
+- No clean mobile RFNAV-006 GPS qualification yet; the 2026-09-28 moving capture is mechanically confounded by a soldered-wire failure in the hand-built rig.
 
 ## Known unknowns
 
-Physical receiver make/package and firmware; exact serial wire protocol and baud at the receiver; hash of the Aug. 24 executable and its exact live config; whether the 2018 RTC provider executed; which component selected the old epoch in the 2009 run; why 2009 output was 2007 while the later run produced a current date; exact trigger for the ASIC-dead watchdog; live GPIO/MMIO/reset/power behavior; and which application consumed each GPS output remain unresolved.
+Physical receiver make/package and firmware; exact serial wire protocol and baud at the receiver; hash of the Aug. 24 executable and its exact live config; whether the 2018 RTC provider executed; which component selected the old epoch in the 2009 run; why 2009 output was 2007 while the later run produced a current date; exact trigger for the ASIC-dead watchdog; live GPIO/MMIO/reset/power behavior; and which stock application consumed each GPS output remain unresolved. For RFNAV-006 specifically, exact motion hysteresis/stop constants and a clean repeated moving-jitter envelope remain pending a mechanically repaired field rig.
 
 ## Canonical references
 
 - [TT3 Tomi device profile](../devices/tt3-tomi.md) — stable device and software-platform identity; intentionally leaves physical GPS package unresolved.
+- [RF Navigator](../architecture/rfnav.md) — consumes this provider contract for RFNAV-006 geographic scoring and preserves GPS-loss as a nonblocking mode.
 - [Tomi boot chain](../architecture/tomi-boot-chain.md) — Linux image and boot boundary, not GPS runtime details.
 - [Tomi Runtime ABI](tomi-runtime-abi.md) — command compatibility only.
 - [Evidence Index](../../evidence/INDEX.md) — selected durable evidence anchors.
 
 ## Provenance
 
-The external reconciliation report for this migration is `/mnt/d/Codex/TT3/luce-bootstrap-tomi-gps-glgps-reconciliation-2026-09-24.md`. It inventories GPS-related work units, exact specimen hashes, source and transcript paths, investigation dispositions, and unresolved provenance boundaries. Raw captures, binaries, and analysis tooling remain in their existing evidence locations; none were moved into LUCE.
+The external reconciliation report for the LUCE bootstrap is `/mnt/d/Codex/TT3/luce-bootstrap-tomi-gps-glgps-reconciliation-2026-09-24.md`. It inventories GPS-related work units, exact specimen hashes, source and transcript paths, investigation dispositions, and unresolved provenance boundaries.
+
+RFNAV-006 state characterization added two direct `/var/run/ttgps.state` captures on 2026-09-28:
+
+```text
+gps-stationary-v001.log
+size 1286552 bytes
+SHA-256 c31c3ea1e0988b3b4eb544d283efc9020c0bbf41d82e17370fe3ded8c95b5c76
+
+gps-moving-v001.log
+size 1261831 bytes
+SHA-256 b9e40735f3aa7813d5900f2abd93bc5811ea2b24e4ed8a23bd4e99c5f84a905f
+```
+
+The stationary log is a clean bench characterization. The moving log is accepted as partial evidence only because the hand-built TomiDock rig suffered a soldered-wire mechanical failure during the first intentional movement. Exact coordinates are intentionally omitted from LUCE. Raw captures, binaries, and analysis tooling remain evidence; they are not duplicated into this public canonical repository.
