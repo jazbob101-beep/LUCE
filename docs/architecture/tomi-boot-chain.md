@@ -16,11 +16,17 @@ Static re-audit of that exact 5.5279 package corrected the earlier board-profile
 
 For Tomi, this is strong package/platform-correlated evidence, not an independently instrumented trace of a particular power-on. A later read-only TT3 sector acquisition and replay of the Austin directory lookup against one captured V003 storage state confirmed that an entry with the Linux VFAT dummy short-name field could be skipped before the integrity-checked TTBL loader opened `TTSYSTEM`; that is a historical specimen-specific observation, not a statement about the current directory. The TT3 evidence identifies Linux-visible main storage as `/dev/mmcblk0` and the Austin software profile as S3C2412, but does not expose a normal live bootloader read trace. USB MSC in the analyzed bootloader is device/target-side service, not evidence of booting directly from a USB stick. Likewise, the bounded search found no grounded USB-host boot path; this is a static-analysis result for the specimen, not an absolute claim about every possible build.
 
+The follow-on CMDLINE bounds audit closes the local-copy question for this package. The reader at `0x30b0d9dc` clears a 1,024-byte source buffer, accepts declared file lengths below `0x400`, and normalizes bytes below `0x20` to NUL. Bounded selector tests reached that reader before the first image-load attempt for the tested `DIAGSYS`, `SIGNAPPSIGN`, `SYSTEM`, `TTSYSTEM`, `LTSYSTEM`, all-load-fail and USB-priority cases. `LTSYSTEM` still follows its separate reset/update route rather than the ordinary Linux parameter-builder handoff.
+
 ## Linux image path and handoff
 
 The historical TT3 `ttsystem` specimen is a separate 4,212,715-byte `TTBL` container, not the bootloader image. Its first section is loaded at `0x31700000` and contains a small wrapper/decompressor followed by a gzip-compressed Linux kernel. Its second section is a gzip initramfs loaded at `0x31000000`. The container terminator records entry value `0x31700000` and parameter value `0x30000000`. A no-change extraction/rebuild reproduced the complete file byte-for-byte, both payloads, the initramfs tree, and the TTBL structure.
 
 The 5.5279 loader's generic TTBL routine is directly observed in the matching `SYSTEM` update-package disassembly: it validates `TTBL`, loads section payloads to file-declared addresses, checks each payload with MD5 plus an embedded-key Blowfish integrity tag, obtains an entry address and parameter from the terminator, constructs boot parameters, and transfers control at **`0x30b050f4: bx r3`**. The payload tag does **not** authenticate the destination address, final entry or parameter address; bounded original-instruction tests accepted changed addresses with unchanged valid payload/tag bytes. No reached public-key/vendor-authenticity gate or entry-range check was found in this generic handoff.
+
+The ordinary parameter builder contains a 32-byte `ATAG_CMDLINE` payload followed immediately by the eight-byte zero-sized `ATAG_NONE` terminator. Its NUL-terminated CMDLINE copy has no destination-length argument. Thirty-one data bytes plus NUL are the strict contained maximum. At effective length `S=32`, the terminating NUL is written one byte past the CMDLINE payload into an already-zero first byte of `ATAG_NONE.size`, so no value changes in the original template. Effective terminator corruption begins at `S=33`; the copy reaches saved `r4` at `S=40`, saved `lr` at `S=44`, and the caller frame at `S=48`.
+
+The builder exports exactly `0xdc` bytes from its local parameter template to the TTBL trailer-selected parameter address, ending at the `ATAG_NONE` header. Thus CMDLINE-derived ATAG corruption can reach the outgoing Linux parameter block, while saved-register and caller-frame corruption remain local to the builder frame. Matching OpenTom kernel source walks tags until a zero `hdr.size`, so corruption beginning at `S=33` removes the intended terminator; exact downstream behavior of malformed lists is not established. The normal tested path reaches `0x30b050f4: bx r3` before the builder restores its saved registers, and the bounded audit deliberately did not execute the loaded entry or return through a corrupted saved LR. These findings establish memory and parameter-construction bounds, **not a post-handoff control-flow consequence or exploit path**.
 
 Do not treat the update package's own entry (which dispatches to its section 2) as the Linux handoff merely because its numeric value matches the historical Linux bundle entry. The matching TT3 `ttsystem` layout supports this separate chain: bootloader selects and validates the Linux bundle; control enters the first loaded wrapper at `0x31700000`; that wrapper inflates the kernel and transfers to fixed decompressed Linux entry `0x30008000`, while the initramfs is the second container payload.
 
@@ -35,7 +41,7 @@ The `SYSTEM` file is an update/package specimen containing a 5.5279 bootloader p
 ## Established versus inferred behavior
 
 - **Direct TT3 identity evidence:** bootloader version strings, TT3 root-level `SYSTEM` bytes, historical `ttsystem` bytes, and Tomi Linux boot/storage observations.
-- **Direct binary observations:** the matching `SYSTEM` package's bootstrap, corrected Austin storage/USB registration, FAT/name selector, TTBL integrity loader/trust boundary, retained-RAM resume branch, updater/reset paths, and handoff code.
+- **Direct binary observations:** the matching `SYSTEM` package's bootstrap, corrected Austin storage/USB registration, FAT/name selector, CMDLINE reader and exact parameter-copy bounds, TTBL integrity loader/trust boundary, retained-RAM resume branch, updater/reset paths, and handoff code.
 - **Reconstructed-container evidence:** historical TT3 `ttsystem` section map, payload identities, and byte-identical no-change round trip.
 - **Inference with limits:** these artifacts together support the stated Tomi boot path, but no preserved trace observes every branch and address during a current physical boot, and no acquired NOR image binds the active bootloader to the update-package specimen.
 
@@ -52,7 +58,7 @@ In the analyzed Austin 5.5279 and Atlas III 1.0012 normal startup paths, executi
 - Contents and control flow of any earlier SoC ROM/reset stage.
 - Byte identity of the executing Tomi bootloader in NOR versus the captured `SYSTEM` update package.
 - Which boot filename/fallback branch was taken on any particular boot.
-- Complete interpretation of the remaining `SYSTEM` version-probe return codes and exact consequences/bounds of the `CMDLINE.TXT` local-copy path.
+- Complete interpretation of the remaining `SYSTEM` version-probe return codes, downstream Linux behavior for malformed CMDLINE-derived ATAG lists, and real filesystem short/error-read semantics.
 - Complete partitionless legacy-MSC initialization behavior beyond the demonstrated missing-image/red-X cases.
 - Physical retained-RAM resume behavior on current Tomi hardware/software.
 - Final decompressor-to-kernel handoff details and exact meaning of the historical container parameter `0x30000000`.
@@ -61,9 +67,9 @@ In the analyzed Austin 5.5279 and Atlas III 1.0012 normal startup paths, executi
 ## Canonical references
 
 - [Tomi device profile](../devices/tt3-tomi.md) — hardware and firmware identity, including the two distinct `ttsystem` specimens.
-- [Tomi bootloader image reference](../reference/tomi-bootloader-image.md) — specimen hashes, byte maps, formats, and extraction boundaries.
+- [Tomi bootloader image reference](../reference/tomi-bootloader-image.md) — specimen hashes, byte maps, CMDLINE/ATAG bounds, formats, and extraction boundaries.
 - [Evidence Index](../../evidence/INDEX.md) — selected durable evidence anchors.
 
 ## Provenance
 
-Primary inputs are the TT3 2026-08-04 filesystem capture and critical-files bundle, the TT3 no-change `ttsystem` round-trip package, the earlier TT1/Austin 5.5279 investigations, and the 2026-09-28 independent execution-path re-audit at `/mnt/d/Codex/TT3/s55279-execution-path-reaudit-20260928/REPORT.md`. The re-audit re-extracted and re-traced the byte-identical TT1/TT3 `SYSTEM` package, correcting the Austin/Bergamo constructor attribution while confirming the core FAT/TTBL and USB-latch findings. The Austin binary findings remain package/binary evidence and are not promoted to live-NOR observations.
+Primary inputs are the TT3 2026-08-04 filesystem capture and critical-files bundle, the TT3 no-change `ttsystem` round-trip package, the earlier TT1/Austin 5.5279 investigations, the 2026-09-28 independent execution-path re-audit at `/mnt/d/Codex/TT3/s55279-execution-path-reaudit-20260928/REPORT.md`, and the follow-on CMDLINE bounds set at `/mnt/d/Codex/TT3/s55279-cmdline-bounds-audit-20260928/`. The execution-path re-audit re-extracted and re-traced the byte-identical TT1/TT3 `SYSTEM` package, correcting the Austin/Bergamo constructor attribution while confirming the core FAT/TTBL and USB-latch findings. The CMDLINE audit executed bounded original instructions with synthetic data and explicit substitutions, preserving exact boundary results while stopping before loaded-entry execution or corrupted-return control flow. The Austin binary findings remain package/binary evidence and are not promoted to live-NOR observations.
