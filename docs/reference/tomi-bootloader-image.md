@@ -27,9 +27,9 @@ The following offsets are package-file offsets in the exact 1,030,991-byte `SYST
 | `0x0000b90c–0x0002780d` | `0x1bf02` (114,434) | Gzip member named `bootloader`; payload-relative source starts at `0xb900`; expands to 258,408 bytes at `0x30b00000`. | Header and working inflate path; confirmed. |
 | `0x0002780e–0x0003fffb` | `0x187ee` (100,334) | `0xff` padding/erased area. | Direct byte census. |
 | `0x0003fffc–0x0004000b` | 16 bytes | Six-byte version text `5.5279` plus padding. The platform's `SYSTEM` probe reads six bytes at `0x3fffc`. | Direct bytes and code cross-reference; confirmed. |
-| `0x0004000c–0x0004001b` | 16 bytes | First-section signature. First section payload length is `0x40000` bytes. | Direct structure parse; signature algorithm details are in the loader section below. |
+| `0x0004000c–0x0004001b` | 16 bytes | First-section integrity tag (historically called a signature). First section payload length is `0x40000` bytes. | Direct structure parse; tag algorithm details are in the loader section below. |
 
-The first section occupies file offsets `0x00000004–0x0004001b` including its header and signature; it is only the first of 19 nonempty sections in the full 1,030,991-byte (`0x0fbb4f`) update package. The full TTBL section directory, parsed directly from the package headers, is:
+The first section occupies file offsets `0x00000004–0x0004001b` including its header and integrity tag; it is only the first of 19 nonempty sections in the full 1,030,991-byte (`0x0fbb4f`) update package. The full TTBL section directory, parsed directly from the package headers, is:
 
 | Section | Header offset | Payload file range (end-exclusive) | Size (decimal) | Load address |
 |---:|---:|---:|---:|---:|
@@ -61,7 +61,7 @@ The zero-size terminator begins at `0x000fbb3b`; its entry is `0x31700000` and p
 |---|---|---|---|
 | `0x00000–0x28d67` | `0x30b00000–0x30b28d67` | Mixed ARM code, literal pools, inline strings, and platform records. | Code/data mix confirmed; not every byte is code. |
 | `0x28d68–0x3cd3f` | `0x30b28d68–0x30b3cd3f` | Non-code assets and sparse tables. | Broad classification supported; exact substructure unresolved. |
-| `0x3cd40–0x3dd87` | `0x30b3cd40–0x30b3dd87` | Blowfish constants/tables. | Confirmed by signature-key setup references. |
+| `0x3cd40–0x3dd87` | `0x30b3cd40–0x30b3dd87` | Blowfish constants/tables. | Confirmed by integrity-tag key setup references. |
 | `0x3dd88–0x3e323` | `0x30b3dd88–0x30b3e323` | Runtime/library strings and tables. | Strong string/reference evidence. |
 | `0x3e324–0x3f167` | initialized data copied to `0x30008000–0x30008e43` | Writable initialized-data image. | Startup copy loop identified. |
 
@@ -69,19 +69,29 @@ The bootstrap at package payload-relative `0x8000` selects output base `0x30b000
 
 ## Austin-configured boot-source and package loader findings
 
-The matching image's static Austin/type-42 initialization configures `HSMOVINAND` and FAT16/32 as its grounded direct package source. Its 8.3 name set includes `DIAGSYS`, `SIGNAPPSIGN`, `SYSTEM`, `TTSYSTEM`, `LTSYSTEM`, and `CMDLINE.TXT`. The `SYSTEM` probe checks `TTBL`, requires a first-section size of `0x40000`, reads the six-byte version footer at `0x3fffc`, and selects among standard names. Exact product semantics for each probe result are unresolved.
+The 2026-09-28 S5.5279 execution-path re-audit corrected an earlier board-profile attribution. In the byte-identical TT1/TT3 package, **`0x30b1fad4` is the Austin/type-42 constructor** and **`0x30b1fe24` is Bergamo/type-43**. Austin selects the legacy MOVINAND/iNAND SDI storage path and the full-speed USB device controller at `0x52000000`; the HSMOVINAND/high-speed USB paths previously cited as Austin are real code in the multi-board image but belong to Bergamo's selected profile. This correction changes controller-specific explanations without invalidating the shared FAT loader, USB-priority predicate, red-X recovery model, or TTBL format.
 
-The generic signed-TTBL loader:
+Austin's grounded package source is the internal MMC/SDI block device with FAT16/32. Its 8.3 name set includes `DIAGSYS`, `SIGNAPPSIGN`, `SYSTEM`, `TTSYSTEM`, `LTSYSTEM`, and `CMDLINE.TXT`. The `SYSTEM` probe checks `TTBL` and reads the six-byte version footer at file offset `0x3fffc`. A first-section size other than `0x40000` selects an update attempt; it is not a universal structural rejection. Successful `LTSYSTEM` loading takes `0x30b0dac0 -> 0x30b0567c -> 0x30b051f0` and requests reset rather than following the ordinary TTBL image handoff. Exact product semantics of every other probe result remain unresolved.
+
+### TTBL trust and handoff model
+
+The generic TTBL loader:
 
 1. Requires little-endian magic `0x4c425454` (bytes `TTBL`).
-2. Reads section size and destination address; copies each payload to its declared address.
-3. Computes MD5 and validates each 16-byte signature using the inline Blowfish key `d888d313ed83baad9cf41b50b343fadd` to decrypt the signature halves before comparison.
+2. Reads each payload length and destination address and copies the payload to that file-declared address.
+3. Computes MD5 over the payload and validates the associated 16-byte integrity tag using the embedded Blowfish key `d888d313ed83baad9cf41b50b343fadd`.
 4. Reads entry and parameter values from the zero-size terminator and stores them at `0x30109fcc` and `0x30109fd0`.
-5. Builds boot parameters and branches to the recorded entry (`bx r3` in the analyzed image).
+5. Builds boot parameters and transfers control at **`0x30b050f4: bx r3`**, with `r3` holding the trailer-declared entry.
+
+The integrity tag covers the payload bytes, not the section destination, final entry, or parameter address. Bounded execution of the original loader accepted a changed destination (`0x32000000`) and changed entry/parameter (`0x33800000` / `0x33900000`) while retaining the original payload/tag bytes. No destination sandbox, load-address authenticity check, entry-range check, or public-key/vendor-authenticity gate was found in the reached generic loader. There is real cryptographic processing, but the Blowfish key is embedded in the loader; this mechanism establishes payload integrity, not vendor-exclusive authenticity.
 
 For the analyzed `SYSTEM` update package, the TTBL tail entry is `0x31700000` and parameter is `0x30000000`. These are package-specific handoff values; do not transfer them to another `ttsystem` specimen or call the parameter's meaning known.
 
-The same static analysis identifies USB Mass Storage as a device-side target, including CBW/CSW handling and SCSI read/write paths. It did not find a grounded USB-host/OHCI initialization or USB-storage boot source in this specimen. This is a bounded binary-analysis negative, not a proof about every bootloader revision.
+### Austin USB and retained-RAM paths
+
+Austin USB is a full-speed **device-side Mass Storage** path, not a demonstrated USB-host boot source. The reached path parses MSC CBWs and SCSI READ(10)/WRITE(10), with WRITE(10) eventually persisting blocks through the Austin legacy MMC/SDI storage callbacks. Executable bytes can therefore arrive over USB as ordinary storage blocks and later be selected from FAT by the TTBL loader. No direct USB-to-caller-chosen-RAM-to-jump service, DFU-style downloader, vendor `go` command, or generic UART download-and-execute path was established. The stronger claim that every partitionless legacy-MSC initialization case is independent of FAT/storage state remains unresolved after removing the earlier Bergamo-only high-speed proof.
+
+Separate from file loading, the package bootstrap contains an S3C2412 retained-state resume path. It reads INFORM0 at `0x4c000070`; when mask `2` selects retained state and INFORM1 at `0x4c000074` is not sentinel `0x8024`, it restores clock/memory state, prepares the watchdog, reloads INFORM1 and transfers control at **`0x0000a550: mov pc,r0`**. No TTBL/tag or entry-range check occurs on that branch. OpenTom suspend/resume source writes the resume address into INFORM1, strongly correlating this with intended Linux resume behavior rather than an external downloader. Physical retention behavior on Tomi remains unqualified.
 
 ## Historical TT3 `ttsystem` map
 
@@ -89,12 +99,12 @@ The historical 2026-08-04 TT3 `ttsystem` is an outer TTBL Linux-system container
 
 | File range | Section / interpretation | Address or identity |
 |---|---|---|
-| `0x00000000–0x0012121b` | First section: 1,184,256-byte payload begins at `0x0c`; wrapper/decompressor at payload offsets `0x0000–0x35a3`, then gzip kernel at `0x35a4–0x12113d`; section signature begins at `0x12120c`. | Section address `0x31700000`; payload SHA-256 `6a6e585bb7653156d0cc5c661a214acb15667372441e88b497746d741d51a9b8`. |
-| `0x0012121c–0x004047de` | Second section: 3,028,395-byte gzip initramfs payload begins at `0x121224`; payload ends exclusive at `0x4047cf`; signature follows. | Section address `0x31000000`; payload SHA-256 `e31842fa8300a38fef32bea34b8843fcb58ce361dffa0cee95c6c212518ef264`. |
-| `0x004047cf–0x004047de` | Second-section 16-byte signature. | `893fb372c004f2122504038e468fa49d`. |
+| `0x00000000–0x0012121b` | First section: 1,184,256-byte payload begins at `0x0c`; wrapper/decompressor at payload offsets `0x0000–0x35a3`, then gzip kernel at `0x35a4–0x12113d`; section integrity tag begins at `0x12120c`. | Section address `0x31700000`; payload SHA-256 `6a6e585bb7653156d0cc5c661a214acb15667372441e88b497746d741d51a9b8`. |
+| `0x0012121c–0x004047de` | Second section: 3,028,395-byte gzip initramfs payload begins at `0x121224`; payload ends exclusive at `0x4047cf`; integrity tag follows. | Section address `0x31000000`; payload SHA-256 `e31842fa8300a38fef32bea34b8843fcb58ce361dffa0cee95c6c212518ef264`. |
+| `0x004047cf–0x004047de` | Second-section 16-byte integrity tag. | `893fb372c004f2122504038e468fa49d`. |
 | `0x004047df–0x004047ea` | 12-byte trailing entry/parameter record; file length is `0x4047eb` bytes. | Raw bytes `000000000000703100000030`; parsed entry `0x31700000`, parameter `0x30000000`. |
 
-First section signature at file offset `0x12120c`: `b5bc555b2606e468bcf4a3be5b1fdc3a`. The compressed kernel member is 1,170,330 bytes, SHA-256 `aa21b08897527e5440c1c5ec7fbd9359e8f909d30624a3d5d534337e77361946`. The 230-byte interval from the compressed kernel's end-exclusive offset `0x12113e` to the initramfs start `0x121224` spans the end of section-1 payload, its signature, and the next section header; the round-trip report classifies it as metadata/padding and does not assign internal semantics. The initramfs expands to 7,214,080 bytes, SHA-256 `0e4e240ddfb2acae51a6627a92b5e09b51f56f938d191b3dec1c698de30da1c8`.
+First-section integrity tag at file offset `0x12120c`: `b5bc555b2606e468bcf4a3be5b1fdc3a`. The compressed kernel member is 1,170,330 bytes, SHA-256 `aa21b08897527e5440c1c5ec7fbd9359e8f909d30624a3d5d534337e77361946`. The 230-byte interval from the compressed kernel's end-exclusive offset `0x12113e` to the initramfs start `0x121224` spans the end of section-1 payload, its integrity tag, and the next section header; the round-trip report classifies it as metadata/padding and does not assign internal semantics. The initramfs expands to 7,214,080 bytes, SHA-256 `0e4e240ddfb2acae51a6627a92b5e09b51f56f938d191b3dec1c698de30da1c8`.
 
 This historical layout does **not** describe the separately acquired 2026-08-31 live-baseline `ttsystem` (2,219,582 bytes, SHA-256 above). Its format and internal map remain uncharacterized by the cited package.
 
@@ -117,10 +127,14 @@ The related cross-family boot-drum investigation (`/mnt/d/Codex/TT3/tomtom-boot-
 - The first 8,192 package bytes (`0x0c–0x200b`) remain opaque; no field names are assigned.
 - The live bootloader's raw NOR image and byte identity are unavailable.
 - The live-baseline `ttsystem` has not been structurally mapped here.
-- `CMDLINE.TXT` use, version-probe policy labels, several padding/metadata fields, and the TTBL parameter's meaning remain unresolved.
+- `CMDLINE.TXT` is parameter input, but the exact consequences/bounds of its separate local-copy path remain unresolved; version-probe policy labels, several padding/metadata fields, and the TTBL parameter's meaning also remain unresolved.
 - The broad asset/sparse-table interval is not decoded field by field.
 - Direct code observations in the Austin-configured package are not by themselves a physical-runtime trace of Tomi.
 - No safe bootloader write/recovery procedure is established by this forensic work.
+
+## 2026-09-28 execution-path re-audit provenance
+
+The current Austin/Bergamo correction, TTBL trust-boundary tests, actual Austin USB path, retained-RAM resume trace, `LTSYSTEM` reset behavior and SYSTEM-size selection correction are adjudicated from `/mnt/d/Codex/TT3/s55279-execution-path-reaudit-20260928/REPORT.md`. That work re-reviewed the earlier TT1 investigations rather than discarding them, re-extracted the byte-identical TT1/TT3 package, executed bounded original loader/profile/resume instructions, and preserved exact evidence identities and focused disassembly. It did not alter LUCE, firmware, source trees or hardware. Installed live-NOR identity remains unresolved.
 
 ## Related canonical reference
 
