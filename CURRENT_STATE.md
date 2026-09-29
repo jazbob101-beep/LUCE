@@ -55,6 +55,14 @@ Production GPS rules are now preserved in [Tomi GPS and `glgps` Reference](docs/
 
 See [RF Navigator](docs/architecture/rfnav.md) for protocol, UI behavior, RFNAV-006 product design, map qualification details, evidence identities, and limits.
 
+### S5.5279 bootloader re-audit
+
+The 2026-09-28 S5.5279 execution-path re-audit re-inspected the earlier TT1 research against the underlying byte-identical TT1/TT3 `SYSTEM` package and corrected one important board-profile attribution. **Austin/type 42 is constructor `0x30b1fad4`, selecting legacy MOVINAND/iNAND SDI and the full-speed USB device controller at `0x52000000`; `0x30b1fe24` is Bergamo/type 43 and owns the previously cited high-speed paths.** The shared FAT/TTBL loader, USB reset-latch admission model and red-X-to-MSC recovery conclusions survive, but controller-specific Austin explanations must use the corrected path.
+
+The generic TTBL loader checks payload integrity with MD5 plus an embedded-key Blowfish tag, but the tag does not authenticate section destination addresses, the final trailer entry or parameter address. Bounded original-instruction tests accepted changed addresses with unchanged valid payload/tag bytes. The ordinary handoff is `0x30b050f4: bx r3`, with `r3` holding the media-supplied trailer entry; no reached public-key vendor-authenticity or entry-range gate was established. USB can deliver executable bytes as ordinary MSC storage blocks for later FAT loading, but no direct USB/UART download-and-go path was found.
+
+A separate S3C2412 retained-state branch uses INFORM1 as a resume target and transfers at `0x0000a550: mov pc,r0`; source correlation identifies this as the intended suspend/resume contract rather than an external loader. Successful `LTSYSTEM` loading requests reset rather than normal trailer handoff, and a SYSTEM first-section size other than `0x40000` selects the update attempt rather than universal rejection. Exact installed NOR identity, especially the protected low prefix/reset path, remains unresolved. Detailed ownership is in [Tomi Bootloader Image Reference](docs/reference/tomi-bootloader-image.md) and [Tomi Boot Chain](docs/architecture/tomi-boot-chain.md).
+
 ### PowerFlight
 
 A preserved PowerFlight v001.5.3 run archive has six payloads verified against its embedded manifest and no `BLOCKED` events; its Tomi-specific records strongly support a physical Tomi run, but the acquisition path and exact recorder bytes are not bound. Its final recorded state was `VBUS=0`, `CHARGE=0`, `CHILD=1`, `USB_STATE_HOST`, `last_error=0x0`, `BATTERY_RETURN_CHILD_ATTACHED`. See the [power/battery reference](docs/reference/tomi-power-battery.md) for provenance limits.
@@ -87,6 +95,10 @@ The Phase 4F reduced observer remains diagnostic-only, not production architectu
 - `course_true_deg` is not a stationary movement-direction source. Use speed as the primary motion gate and derive movement direction from accepted position displacement after motion is established.
 - Approximately 0.30 m/s sustained across multiple fresh GPS-quality updates is the current evidence-based movement-start candidate, not a final universal threshold.
 - GPS provider-alive/no-fix is a normal nonblocking RFNAV state: geographic scoring pauses, ordinary RFNAV-005 tracking remains usable.
+- S5.5279 Austin/type42 uses the legacy MOVINAND/iNAND SDI and full-speed USB-device path; the previously cited HSMOVINAND/high-speed constructor is Bergamo/type43 and must not be used as Austin evidence.
+- TTBL payload integrity does not authenticate load destinations, trailer entry or parameter address; the reached generic handoff contains no public-key/vendor-authenticity or entry-range gate.
+- S5.5279 USB recovery is device-side MSC/block storage for later FAT/TTBL loading; no direct USB/UART download-and-go service is established.
+- The retained-INFORM1 branch is a separate resume control transfer, not evidence of an external downloader.
 - GPIO4 remains removed/unconnected and has no RFNAV role.
 - Role-aware Tomi boot integration already exists. Do not revive a proposed boot-integration v002.
 - Never issue `echo host > /sys/devices/platform/tomtomgo-usbmode/mode`; prior use caused rc=139/kernel Oops behavior.
@@ -104,10 +116,13 @@ The Phase 4F reduced observer remains diagnostic-only, not production architectu
 - Deterministic no-GPIO physical-detach fail-close remains formally unproven; historical A8/premature-MOUNT observations remain closed as an unrelated unresolved lifecycle boundary.
 - Exact installed provenance for the current `tomidock-netd` and `/etc/rc` remains unbound. The qualified RFNAV ESP and Tomi UI binaries have recorded build identities, but no independent post-install readback of every deployed component is asserted here.
 - The exact Tomi VBUS-switch implementation and formal USB self-powered compliance remain undocumented/unestablished.
+- Exact installed S5.5279 NOR identity, including the protected low 32 KiB/reset-prefix route, remains unresolved. A future read-only capture is conditional on an already-established safe access path; no new flash/update experiment is required merely to re-prove package-level findings.
 
 ## Canonical map
 
 - [TT3 “Tomi” device profile](docs/devices/tt3-tomi.md) — device identity and stable hardware facts.
+- [Tomi Boot Chain](docs/architecture/tomi-boot-chain.md) — S5.5279 stage ordering, corrected Austin profile path, TTBL handoff and retained-RAM resume boundary.
+- [Tomi Bootloader Image Reference](docs/reference/tomi-bootloader-image.md) — S5.5279 package identity, TTBL trust model, USB/MMC path, updater and control-transfer details.
 - [TomiDock Architecture](docs/architecture/tomidock.md) — physical/USB/network design, portable-power observation, mechanical field limit, lifecycle, and safety constraints.
 - [RF Navigator](docs/architecture/rfnav.md) — RFNAV behavior, protocols, UI, RFNAV-006 production design, map qualification state, evidence identities, and staged development.
 - [Tomi GPS and `glgps`](docs/reference/tomi-gps-glgps.md) — GPS stack, current `ttgpsd` state-provider contract, stationary/moving characterization, and RFNAV-006 motion-gating rules.
