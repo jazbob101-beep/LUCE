@@ -325,7 +325,7 @@ The product model is:
 - ordinary RFNAV-005 tracking remains usable when GPS is unavailable or stale;
 - geographic scoring consumes actual RFN1 `OBS` samples only; cached DISCOVER/SELECT RSSI is not geographic evidence;
 - target change resets the active geographic session initially; cross-session persistence is deferred until separately designed;
-- RFNAV reads the existing Tomi GPS state-provider output rather than competing for the GPS UART/FIFO. The exact live provider schema and stationary/moving jitter envelope must be physically verified before production scoring constants are frozen.
+- RFNAV reads the existing Tomi GPS state-provider output rather than competing for the GPS UART/FIFO. The live provider schema and stationary/moving envelope have been physically characterized, including repaired-rig moving v002. The initial motion policy and its evidence limits are owned by [Tomi GPS and `glgps` Reference](../reference/tomi-gps-glgps.md).
 
 Maps are **context, not routing**. RFNAV-006 does not attempt turn-by-turn navigation.
 
@@ -435,7 +435,7 @@ Completed:
 
 Active production-design stage:
 
-- **RFNAV-006:** integrate physically verified Tomi GPS state with RFN1 OBS history, Signal Rose/best-area guidance and the proven regional offline map architecture. First implementation work should verify the live GPS state-provider schema and jitter envelope, productionize the three LOD policies, then integrate geographic RF scoring without weakening RFNAV-005 operation when GPS is absent.
+- **RFNAV-006:** integrate physically verified Tomi GPS state with RFN1 OBS history, Signal Rose/best-area guidance and the proven regional offline map architecture. The repaired-rig moving v002 completes the deferred GPS characterization. Next implement a bounded GPS/motion model and actual RFN1 OBS geographic-correlation replay harness using the existing RFNAV-005 source. Preserve signal tracking when GPS is absent. Production map LOD and integrated Signal Rose/best-area UI follow this tested core; v002 is not full RFNAV-006 qualification.
 
 Later work may add geographic-session persistence, associated-uplink edge-case qualification, and BLE discovery/tracking. Those are not RFNAV-005 or current RFNAV-006 feasibility claims.
 

@@ -126,7 +126,32 @@ samples 207-300  no valid fix
 
 Thus 146/300 snapshots had valid navigation/position/fix and 154/300 did not. The principal valid run, samples 64-206, lasted about 160 seconds. Within all valid snapshots, 82 reported positive speed and 64 reported zero speed. Positive reported walking speeds ranged from **0.309 to 0.926 m/s**, with median **0.720 m/s**. Of the 146 valid snapshots, 127 reported `fix_quality_name=gps` and 19 reported `fix_quality_name=estimated`; only 4 of the 82 positive-speed snapshots were `estimated`.
 
-This capture materially strengthens one classifier finding despite its mechanical limitation: the bench-stationary capture reported exactly `0.000 m/s` in all 300 snapshots, while positive-speed walking samples began at 0.309 m/s. An initial RFNAV movement-start candidate of approximately **0.30 m/s sustained across multiple fresh GPS-quality state updates** is therefore evidence-based. It is not yet a fully qualified universal threshold because the moving trial was mechanically compromised and sampled only one walking session.
+This capture materially strengthens one classifier finding despite its mechanical limitation: the bench-stationary capture reported exactly `0.000 m/s` in all 300 snapshots, while positive-speed walking samples began at 0.309 m/s. This historically supported an initial **0.30 m/s** movement-start candidate. Repaired-rig v002 below supersedes that candidate; v001 remains partial evidence from a mechanically compromised session.
+
+### RFNAV-006 repaired-rig moving v002 — 2026-09-29
+
+The soldered-wire repair was operator-reported complete before this repeat. The 300-snapshot file is a clean GPS characterization of a real outing, not continuous ECM qualification or full RFNAV-006 product qualification. Logging began indoors because commands could not be issued after leaving the office; the outing included a prolonged operator-reported stationary conversation. Phase interpretation uses the recorded provider state rather than the planned choreography.
+
+| Characteristic | Result |
+|---|---:|
+| Capture duration, first-to-last state publication | 348.02 s |
+| Provider sequence | 312922 -> 313501 (~1.664 Hz) |
+| Provider PID | 320 throughout |
+| `alive` / `stream_open` | 1 / 1 throughout |
+| EOF / reopen / checksum-bad / malformed / overruns | zero throughout |
+| No-fix samples | 1-72 |
+| Continuous valid navigation/position/fix | 73-300 (228 snapshots) |
+| Valid-fix quality | all `gps`; no `estimated` |
+| Positive-speed snapshots | 65 |
+| Positive-speed range / median | 0.257-1.029 / 0.617 m/s |
+
+All 72 no-fix snapshots retained `motion_valid=1` and `speed_mps=2.624` while navigation, position and fix were invalid. A fresh provider publication therefore does not establish valid or fresh motion fields by itself. Motion and geographic scoring must gate the complete fix-validity contract, not speed or `motion_valid` alone.
+
+Valid zero-speed intervals include samples 107-135 (33.63 s), 152-263 (128.99 s), and 268-281 (14.99 s). Course remained frozen during stops and is not a stationary direction source. The long stop is consistent with the reported conversation; exact operator event times were not captured. Positive speed down to 0.257 m/s supports an initial enter threshold of 0.25 m/s rather than the historical v001 0.30 m/s candidate.
+
+Initial implementation policy is enter-moving at >=0.25 m/s, exit-moving at <=0.10 m/s, each after three distinct fresh motion-bearing updates. These are testable application constants, not universal receiver guarantees. This file contains 22 adjacent snapshot pairs with unchanged `last_rmc_uptime_ms`: publication sequences and repeated UI reads must not automatically count as independent motion measurements. Verify the provider source's motion-field provenance before choosing its freshness/persistence key. The maximum valid-snapshot write-to-last-sentence lag in v002 is 1.05 s; two seconds remains a reasonable initial bound, checked against target uptime and the relevant field timestamps.
+
+The earlier 45-second handling transcript supports provider continuity (same PID; sequence 312653 -> 312751 over 58.8 s), but its BusyBox ping failed before collecting ECM data. No ECM sidecar was run during v002. After return, operator-provided `tomi-ping -c 3` output showed 3/3 replies and 0% loss. This establishes post-return connectivity, not uninterrupted ECM delivery during movement; mechanical status is owned by [TomiDock Architecture](../architecture/tomidock.md).
 
 ### RFNAV-006 GPS application contract carried forward
 
@@ -136,11 +161,11 @@ The following rules are durable enough to bake into RFNAV-006 production design 
 2. Treat `alive`/`stream_open` separately from navigation/fix validity. Provider-alive/no-fix is a normal state, not an application failure.
 3. Geographic RF scoring pauses when navigation/position/fix validity is false; ordinary RFNAV-005 signal tracking remains usable.
 4. Use the provider position as context, but never infer motion from accumulated coordinate displacement alone.
-5. Use reported speed as the primary motion gate. The current evidence supports `~0.30 m/s` sustained across multiple fresh GPS-quality updates as the initial movement-start candidate; exact hysteresis/stop constants remain provisional until a repaired field rig can repeat moving qualification.
+5. Use reported speed as the primary motion gate. Repaired-rig v002 refines the initial implementation policy to enter at >=0.25 m/s and exit at <=0.10 m/s, each after three distinct fresh motion-bearing updates. Repeated publications of one measurement must not advance persistence. Invalid, stale or estimated fixes pause scoring immediately and break pending movement/displacement continuity.
 6. Derive Signal-Rose movement bearing from accepted geographic displacement after motion has been established. `course_true_deg` may corroborate movement later, but must not drive direction while stationary or no-fix.
 7. Do not use `fix_quality_name=estimated` as directional-scoring evidence in the initial production implementation. It may still be displayed as degraded position context.
-8. A state age of two seconds is a conservative initial stale threshold based on the observed ~1.666 Hz provider and <=1.03 s write-to-last-sentence lag; this is an application policy, not a receiver guarantee.
-9. Do not hard-code a satellite-count or HDOP cutoff from these two captures alone. Retain those fields for confidence/diagnostic use and gather a clean repeated moving run before promoting a stricter quality gate.
+8. A state age of two seconds is a conservative initial stale threshold based on the observed ~1.66 Hz provider and <=1.05 s write-to-last-sentence lag across the characterized captures; this is an application policy, not a receiver guarantee.
+9. Do not hard-code a satellite-count or HDOP cutoff from these captures alone. Retain those fields for confidence/diagnostic use; v002 completes the deferred clean moving characterization without establishing a stricter quality gate.
 
 These rules close the state-provider architecture question and the stationary false-motion question. They do **not** constitute full RFNAV-006 field qualification.
 
@@ -190,11 +215,11 @@ The captured filesystem includes `ephem/ee_meta.txt` with `Expiry=1329067832`, a
 - No live MMIO validation of the Austin source-profile GPS reset/power mappings.
 - No demonstrated GPS consumer relationship from the custom `ttgpsd` output files to stock navigation software.
 - No proven causal link between the rapid time-sync loop and `FIN,1`.
-- No clean mobile RFNAV-006 GPS qualification yet; the 2026-09-28 moving capture is mechanically confounded by a soldered-wire failure in the hand-built rig.
+- Repaired-rig v002 completes clean moving GPS characterization. Full integrated RFNAV-006 qualification and continuous mobile ECM delivery remain unproven.
 
 ## Known unknowns
 
-Physical receiver make/package and firmware; exact serial wire protocol and baud at the receiver; hash of the Aug. 24 executable and its exact live config; whether the 2018 RTC provider executed; which component selected the old epoch in the 2009 run; why 2009 output was 2007 while the later run produced a current date; exact trigger for the ASIC-dead watchdog; live GPIO/MMIO/reset/power behavior; and which stock application consumed each GPS output remain unresolved. For RFNAV-006 specifically, exact motion hysteresis/stop constants and a clean repeated moving-jitter envelope remain pending a mechanically repaired field rig.
+Physical receiver make/package and firmware; exact serial wire protocol and baud at the receiver; hash of the Aug. 24 executable and its exact live config; whether the 2018 RTC provider executed; which component selected the old epoch in the 2009 run; why 2009 output was 2007 while the later run produced a current date; exact trigger for the ASIC-dead watchdog; live GPIO/MMIO/reset/power behavior; and which stock application consumed each GPS output remain unresolved. For RFNAV-006 specifically, the initial motion hysteresis/persistence policy requires implementation/replay validation and integrated physical qualification. The deferred repaired-rig moving GPS repeat is complete.
 
 ## Canonical references
 
@@ -221,3 +246,6 @@ SHA-256 b9e40735f3aa7813d5900f2abd93bc5811ea2b24e4ed8a23bd4e99c5f84a905f
 ```
 
 The stationary log is a clean bench characterization. The moving log is accepted as partial evidence only because the hand-built TomiDock rig suffered a soldered-wire mechanical failure during the first intentional movement. Exact coordinates are intentionally omitted from LUCE. Raw captures, binaries, and analysis tooling remain evidence; they are not duplicated into this public canonical repository.
+
+Repaired-rig v002 was supplied as `gps-moving-v002.log`, 1,326,625 bytes, SHA-256 `f304318ed45262b300d524e5188974681a54736e5f2b34a1e0031e5888af0430`. The uploaded bytes match the Tomi-side identity recorded in the accompanying terminal transcript. The raw log is preserved in the supplied conversation attachment; the operator transfer workflow stages it in the MacBook `data-share` directory. No independent durable warehouse-path verification is claimed here. The separate post-return three-packet Tomi-Ping result is operator-supplied terminal evidence; its utility binary hash/source identity remains unbound.
+

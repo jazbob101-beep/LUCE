@@ -365,6 +365,16 @@ These are standalone binaries, not BusyBox applets. The 2026-09-24 live observat
 
 No `/mnt/sdcard/opentom/bin/dbclient` was present at capture time. The standalone `scp` contains the literal compiled/default client path `/usr/bin/dbclient`; its `-S program` option is part of the observed tool surface. This document does not prescribe a complete file-transfer workflow.
 
+## Tomi-Ping connectivity utility
+
+For Tomi ICMP timing/loss checks, use the standalone `/mnt/sdcard/opentom/tomi-ping`, not stock BusyBox `ping`. Operator-provided live output on 2026-09-29 proves this exact invocation:
+
+```sh
+/mnt/sdcard/opentom/tomi-ping -c 3 192.168.77.2
+```
+
+It reported three transmitted/received packets, 0% loss, and min/average/max RTT 1.891/2.215/2.564 ms. The counted job exits by itself; no subsequent kill command is needed. Binary/source identity and other flags are not established by this observation. Stock `/bin/busybox ping -c 45 ...` rejected `-c` as an address; its reported plain-ping `Alive!` behavior does not supply the required timing/loss measurements. Do not substitute generic BusyBox option assumptions for this proven standalone utility.
+
 ## Command-generation rules
 
 When writing Tomi-side commands:
@@ -388,3 +398,4 @@ Current live baseline: operator-provided direct-device capture dated 2026-09-24,
 Supplemental live reboot-path evidence was captured directly from Tomi on 2026-09-27: the live `nxmenu` process and working directory, `system-menu.cfg` reboot entry, custom helper size/hash/text, successful GUI reboot behavior, and inert `/bin/busybox reboot` behavior. The absolute helper path will be naturally reconfirmed from Telnet when a future workflow next requires a reboot rather than by adding a synthetic reboot cycle solely for documentation.
 
 Historical compatibility evidence: `/mnt/d/Codex/usbmode-authoritative-state-v004-blackbox-compat-20260903/COMMAND_COMPATIBILITY.md` and `EXACT_RUNTIME.json` describe an exact BusyBox extracted from a hash-verified V003 image, exercised under ARM emulation. Those results are image-scoped and do not replace the current live observations.
+

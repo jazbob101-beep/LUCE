@@ -45,14 +45,11 @@ Normal ESP boot, enumeration as `303a:4002`, CDC-ECM, Wi-Fi/routing/NAPT, and TC
 
 The current hand-built rig can operate from a USB battery bank through its existing miniUSB power input without redesign. During RFNAV-006 map qualification the battery bank had already completed an approximately one-hour functional soak without sleeping or disrupting Tomi/TomiDock operation, and the map renderer, GPS, RFNAV-005, Telnet/ECM and TomiDock networking all operated normally on that portable supply. This is a functional field-prototype power observation, not a current/charge-rate, runtime-capacity, or USB electrical-compliance qualification.
 
-The same rig is **not mechanically qualified for mobile use**. On 2026-09-28, the first intentional attempt to move the complete Tomi/TomiDock/battery assembly for a walking GPS capture caused a soldered wire in the hand-built rig to break free. The exact conductor, joint failure mechanism and electrical consequence were not further characterized before the rig was shelved. No causal claim should be made between that wire failure and the GPS fix-loss intervals present in the simultaneously collected log.
+On 2026-09-28, the first intentional walking attempt caused a soldered wire to break free; the rig was shelved. The exact conductor, joint failure mechanism and electrical consequence were not characterized. No causal claim is made between that wire failure and simultaneous GPS fix loss.
 
-This separates two conclusions that must not be conflated:
+On 2026-09-29, the operator reported the soldered-wire repair complete and resumed a bounded real mobile outing. The repaired assembly survived the outing without a reported physical relapse; GPS/provider continuity remained clean throughout the complete local capture. This clears the immediate repair blocker and completes the deferred moving GPS characterization. It is a bounded functional mobile result, not general mechanical endurance or verified strain-relief construction.
 
-- stationary/bench operation and portable battery power have been strongly demonstrated functionally;
-- physical robustness while being carried or walked has **failed its first real test** and remains unqualified.
-
-The rig is intentionally shelved pending mechanical rework. Future field use should begin with repairing/strain-relieving the physical interconnects and then repeating a bounded movement test; software/map/RFNAV bench results do not need to be re-proven merely because the hand-built wiring failed mechanically.
+Continuous mobile ECM packet delivery was **not measured**: the preliminary BusyBox ping failed and the planned outing sidecar was omitted. Post-return Tomi-Ping reported 3/3 responses at 0% loss, establishing connectivity after return only. GPS details and capture identity belong to [Tomi GPS and `glgps` Reference](../reference/tomi-gps-glgps.md); the proven utility belongs to [Tomi Runtime ABI](../reference/tomi-runtime-abi.md). Software/map/RFNAV-005 qualification remains intact and does not require repetition solely for this repair.
 
 ## USB architecture and lifecycle
 
@@ -142,4 +139,5 @@ Do not equate a source tree, disposable build, or diagnostic image with the curr
 
 The physical GPIO4 removal and smoke result are recorded in `/mnt/d/Codex/TT3/20_GPIO4_JUMPER_REMOVAL_AND_DESIGN_CLOSEOUT_2026-09-24.md`; lifecycle adjudications are in `/mnt/d/Codex/TT3/tomidock-gpio4-bvalid-audit-20260921/`. The BVALID source audit, Wi-Fi candidate, and powered-S3 synthesis are in their respective `/mnt/d/Codex/TT3/` and `/mnt/d/Codex/PPP-investigation/` work units. The inbound-TCP bench finding and built-only boot-host candidate are in `/mnt/d/Codex/PPP-investigation/tomidock-boot-host-v001/REPORT.md`. Full owner selection and remaining evidence boundaries for this maintenance pass are in `/mnt/d/Codex/TT3/luce-tomidock-usb-lifecycle-coverage-fix-2026-09-25.md`.
 
-The 2026-09-28 portable-power and movement result was observed during the RFNAV-006 map/GPS work. The software/GPS capture identities and motion-classification conclusions are owned by [Tomi GPS and `glgps` Reference](../reference/tomi-gps-glgps.md); this page owns the durable TomiDock mechanical conclusion that the current hand-built rig is bench-stable but not yet field-mobile qualified.
+The 2026-09-28 portable-power and movement result was observed during the RFNAV-006 map/GPS work. The software/GPS capture identities and motion-classification conclusions are owned by [Tomi GPS and `glgps` Reference](../reference/tomi-gps-glgps.md); this page owns the mechanical history and the repaired-rig bounded mobile result added on 2026-09-29, including its unmeasured continuous-ECM limit.
+
