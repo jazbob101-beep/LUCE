@@ -73,6 +73,28 @@ The 2026-09-28 S5.5279 execution-path re-audit corrected an earlier board-profil
 
 Austin's grounded package source is the internal MMC/SDI block device with FAT16/32. Its 8.3 name set includes `DIAGSYS`, `SIGNAPPSIGN`, `SYSTEM`, `TTSYSTEM`, `LTSYSTEM`, and `CMDLINE.TXT`. The `SYSTEM` probe checks `TTBL` and reads the six-byte version footer at file offset `0x3fffc`. A first-section size other than `0x40000` selects an update attempt; it is not a universal structural rejection. Successful `LTSYSTEM` loading takes `0x30b0dac0 -> 0x30b0567c -> 0x30b051f0` and requests reset rather than following the ordinary TTBL image handoff. Exact product semantics of every other probe result remain unresolved.
 
+### `CMDLINE.TXT` parameter-copy bounds
+
+The follow-on bounds audit closes the previously unresolved local-copy geometry in this exact S5.5279 package. The reader at `0x30b0d9dc` first clears the 1,024-byte buffer at `0x30109fd4`, opens `CMDLINE.TXT`, obtains its declared length and skips the read when the length is `>= 0x400`. For accepted lengths below 1,024, it reads into the cleared buffer and then replaces every byte below `0x20` within the declared-length range with zero. Thus the effective string length `S` is the number of bytes before the first control byte `< 0x20`, or the full declared length when no such byte occurs. Space (`0x20`), DEL (`0x7f`) and high-bit bytes are not terminators in this normalization pass. The caller does not use the tested read-helper return value after the read; bounded synthetic short/error-return tests therefore establish only caller behavior, not the real filesystem helper's error semantics.
+
+The parameter builder at `0x30b0dacc` allocates `0xe0` local bytes and copies a `0xdc`-byte parameter template from `0x30b3e020` to `P+0x04`, where `P` is the post-subtraction stack pointer. The template's final two nodes are an `ATAG_CMDLINE` with a 32-byte data payload at template offsets `0xb4–0xd3` and an eight-byte zero-sized `ATAG_NONE` header at `0xd4–0xdb`. In the local frame those ranges are `P+0xb8–P+0xd7` and `P+0xd8–P+0xdf`. If the normalized CMDLINE buffer is nonempty, the NUL-terminated copy helper at `0x30b1e160` is called with destination `P+0xb8` and has no destination-length argument; bounded alignment tests confirmed that it writes exactly `S` source bytes plus one terminating NUL.
+
+The resulting boundaries are exact for the tested template and instructions:
+
+| Effective string length `S` | Result |
+|---:|---|
+| `0–31` | Entire copied string is contained in the 32-byte CMDLINE payload. `S=31` is the strict maximum of 31 data bytes plus NUL. |
+| `32` | The 32 data bytes fill the payload and the terminating NUL is written to `P+0xd8`, the first byte of `ATAG_NONE.size`. That byte is already zero, so this is an out-of-field write without a value change in the original template. |
+| `33–36` | Effective corruption of `ATAG_NONE.size` begins at `S=33`. |
+| `37–39` | Corruption extends into the `ATAG_NONE.tag` word. |
+| `40–43` | The copy reaches saved `r4`; `S=40` is the first saved-register modification. |
+| `44–47` | The copy reaches saved `lr`; `S=44` is the first saved-LR modification. |
+| `48+` | The copy reaches the caller's frame; `S=48` is the first caller-frame modification. |
+
+The builder subsequently copies exactly `0xdc` bytes from `P+0x04` to the TTBL trailer-selected parameter address. That exported range ends at `P+0xdf`, so malformed CMDLINE data can alter the outgoing `ATAG_NONE` header but the saved `r4`, saved `lr` and caller-frame bytes are not exported as part of the Linux parameter block. Matching OpenTom kernel source terminates ATAG walking on a zero `hdr.size`; therefore `S>=33` can remove the intended zero-size terminator. The exact downstream behavior of every malformed tag list remains unqualified.
+
+The normal tested image-handoff path reaches `0x30b050f4: bx r3` before the `0x30b0dacc` function restores its own saved registers. The audit deliberately stopped before loaded-entry execution and did not return through a corrupted saved LR. It therefore establishes precise source, ATAG and stack-corruption boundaries but **does not establish a post-handoff control-flow consequence or an exploit path**. Reachability tests also confirmed that the CMDLINE reader runs before the first image-load attempt across the tested `DIAGSYS`, `SIGNAPPSIGN`, `SYSTEM`, `TTSYSTEM`, `LTSYSTEM`, all-load-fail and USB-priority selector cases; `LTSYSTEM` retains its separate reset/update route rather than the ordinary parameter-builder handoff.
+
 ### TTBL trust and handoff model
 
 The generic TTBL loader:
@@ -127,14 +149,16 @@ The related cross-family boot-drum investigation (`/mnt/d/Codex/TT3/tomtom-boot-
 - The first 8,192 package bytes (`0x0c–0x200b`) remain opaque; no field names are assigned.
 - The live bootloader's raw NOR image and byte identity are unavailable.
 - The live-baseline `ttsystem` has not been structurally mapped here.
-- `CMDLINE.TXT` is parameter input, but the exact consequences/bounds of its separate local-copy path remain unresolved; version-probe policy labels, several padding/metadata fields, and the TTBL parameter's meaning also remain unresolved.
+- The exact downstream Linux behavior for malformed CMDLINE-derived ATAG lists, the real filesystem helper's short/error-read semantics, version-probe policy labels, several padding/metadata fields, and the TTBL parameter's meaning remain unresolved.
 - The broad asset/sparse-table interval is not decoded field by field.
 - Direct code observations in the Austin-configured package are not by themselves a physical-runtime trace of Tomi.
 - No safe bootloader write/recovery procedure is established by this forensic work.
 
-## 2026-09-28 execution-path re-audit provenance
+## 2026-09-28 execution-path and CMDLINE-bounds provenance
 
-The current Austin/Bergamo correction, TTBL trust-boundary tests, actual Austin USB path, retained-RAM resume trace, `LTSYSTEM` reset behavior and SYSTEM-size selection correction are adjudicated from `/mnt/d/Codex/TT3/s55279-execution-path-reaudit-20260928/REPORT.md`. That work re-reviewed the earlier TT1 investigations rather than discarding them, re-extracted the byte-identical TT1/TT3 package, executed bounded original loader/profile/resume instructions, and preserved exact evidence identities and focused disassembly. It did not alter LUCE, firmware, source trees or hardware. Installed live-NOR identity remains unresolved.
+The current Austin/Bergamo correction, TTBL trust-boundary tests, actual Austin USB path, retained-RAM resume trace, `LTSYSTEM` reset behavior and SYSTEM-size selection correction are adjudicated from `/mnt/d/Codex/TT3/s55279-execution-path-reaudit-20260928/REPORT.md`. That work re-reviewed the earlier TT1 investigations rather than discarding them, re-extracted the byte-identical TT1/TT3 package, executed bounded original loader/profile/resume instructions, and preserved exact evidence identities and focused disassembly. It did not alter LUCE, firmware, source trees or hardware.
+
+The follow-on CMDLINE audit is preserved at `/mnt/d/Codex/TT3/s55279-cmdline-bounds-audit-20260928/`. Its bounded harness uses the original decoded S5.5279 instructions with synthetic marker data, substitutes filesystem results and unrelated hardware helpers, and deliberately avoids hardware access, input-file writes, loaded-entry execution and corrupted-PC return. The preserved archive `s55279-cmdline-bounds-audit-20260928.tar` is 870,912 bytes with SHA-256 `c01f6f6eb3910f5944b846b680bc45e5072f1a508296d0daa3e93ae27fe55caa`; it contains `BOUNDARIES.md`, exact parameter-template/tag metadata, focused disassembly, source excerpts/identities, the test harness and machine-readable results. Installed live-NOR identity and physical manifestation remain unresolved.
 
 ## Related canonical reference
 
