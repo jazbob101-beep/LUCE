@@ -61,6 +61,8 @@ The 2026-09-28 S5.5279 execution-path re-audit re-inspected the earlier TT1 rese
 
 The generic TTBL loader checks payload integrity with MD5 plus an embedded-key Blowfish tag, but the tag does not authenticate section destination addresses, the final trailer entry or parameter address. Bounded original-instruction tests accepted changed addresses with unchanged valid payload/tag bytes. The ordinary handoff is `0x30b050f4: bx r3`, with `r3` holding the media-supplied trailer entry; no reached public-key vendor-authenticity or entry-range gate was established. USB can deliver executable bytes as ordinary MSC storage blocks for later FAT loading, but no direct USB/UART download-and-go path was found.
 
+The follow-on CMDLINE bounds audit closes the previously unresolved local-copy geometry. The reader accepts declared `CMDLINE.TXT` lengths below 1,024 bytes and normalizes bytes below `0x20` to NUL before an unbounded NUL-terminated copy into a 32-byte `ATAG_CMDLINE` payload. Thirty-one data bytes plus NUL are strictly contained; `S=32` performs an out-of-field zero-on-zero NUL write into the following `ATAG_NONE.size`, effective terminator corruption begins at `S=33`, saved `r4` at `S=40`, saved `lr` at `S=44`, and the caller frame at `S=48`. The exported `0xdc`-byte Linux parameter block includes the `ATAG_NONE` area but excludes the saved-register/caller-frame bytes. The normal tested handoff reaches `bx r3` before those saved registers are restored, so the audit establishes exact memory/parameter bounds but does not establish a post-handoff control-flow consequence or exploit path.
+
 A separate S3C2412 retained-state branch uses INFORM1 as a resume target and transfers at `0x0000a550: mov pc,r0`; source correlation identifies this as the intended suspend/resume contract rather than an external loader. Successful `LTSYSTEM` loading requests reset rather than normal trailer handoff, and a SYSTEM first-section size other than `0x40000` selects the update attempt rather than universal rejection. Exact installed NOR identity, especially the protected low prefix/reset path, remains unresolved. Detailed ownership is in [Tomi Bootloader Image Reference](docs/reference/tomi-bootloader-image.md) and [Tomi Boot Chain](docs/architecture/tomi-boot-chain.md).
 
 ### PowerFlight
@@ -97,6 +99,7 @@ The Phase 4F reduced observer remains diagnostic-only, not production architectu
 - GPS provider-alive/no-fix is a normal nonblocking RFNAV state: geographic scoring pauses, ordinary RFNAV-005 tracking remains usable.
 - S5.5279 Austin/type42 uses the legacy MOVINAND/iNAND SDI and full-speed USB-device path; the previously cited HSMOVINAND/high-speed constructor is Bergamo/type43 and must not be used as Austin evidence.
 - TTBL payload integrity does not authenticate load destinations, trailer entry or parameter address; the reached generic handoff contains no public-key/vendor-authenticity or entry-range gate.
+- S5.5279 `CMDLINE.TXT` has a strict contained limit of 31 data bytes plus NUL in the 32-byte ATAG payload; effective `ATAG_NONE` corruption begins at `S=33`, saved `r4` at `S=40`, saved `lr` at `S=44`, and the caller frame at `S=48`. These are exact package-level bounds, not a proven post-handoff control-flow consequence.
 - S5.5279 USB recovery is device-side MSC/block storage for later FAT/TTBL loading; no direct USB/UART download-and-go service is established.
 - The retained-INFORM1 branch is a separate resume control transfer, not evidence of an external downloader.
 - GPIO4 remains removed/unconnected and has no RFNAV role.
@@ -121,8 +124,8 @@ The Phase 4F reduced observer remains diagnostic-only, not production architectu
 ## Canonical map
 
 - [TT3 “Tomi” device profile](docs/devices/tt3-tomi.md) — device identity and stable hardware facts.
-- [Tomi Boot Chain](docs/architecture/tomi-boot-chain.md) — S5.5279 stage ordering, corrected Austin profile path, TTBL handoff and retained-RAM resume boundary.
-- [Tomi Bootloader Image Reference](docs/reference/tomi-bootloader-image.md) — S5.5279 package identity, TTBL trust model, USB/MMC path, updater and control-transfer details.
+- [Tomi Boot Chain](docs/architecture/tomi-boot-chain.md) — S5.5279 stage ordering, corrected Austin profile path, CMDLINE/ATAG construction bounds, TTBL handoff and retained-RAM resume boundary.
+- [Tomi Bootloader Image Reference](docs/reference/tomi-bootloader-image.md) — S5.5279 package identity, exact CMDLINE copy bounds, TTBL trust model, USB/MMC path, updater and control-transfer details.
 - [TomiDock Architecture](docs/architecture/tomidock.md) — physical/USB/network design, portable-power observation, mechanical field limit, lifecycle, and safety constraints.
 - [RF Navigator](docs/architecture/rfnav.md) — RFNAV behavior, protocols, UI, RFNAV-006 production design, map qualification state, evidence identities, and staged development.
 - [Tomi GPS and `glgps`](docs/reference/tomi-gps-glgps.md) — GPS stack, current `ttgpsd` state-provider contract, stationary/moving characterization, and RFNAV-006 motion-gating rules.
