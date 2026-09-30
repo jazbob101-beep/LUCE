@@ -201,6 +201,19 @@ physical RF qualification is inferred. Both isolated candidates have pinned
 GCC 3.3.4 ARM builds; identities and tests are in
 `/mnt/d/Codex/TT3/rfnav-006-provider-contract-20260929/REPORT.md`.
 
+### Retained-speed consumer correction — 2026-09-29
+
+The isolated provider contract and binary above are unchanged. Independent
+provider-parser/writer-to-RFNAV tests showed that v004 chose retained RMC speed
+but applied start/stop thresholds to legacy mixed speed, which a later VTG can
+change. Isolated RFNAV v005 now applies both thresholds to the selected
+retained speed. The source reproduction fails in both directions on unchanged
+v004 and passes on v005 with duplicate/publication, intermediate-speed and
+extension-free fallback checks. Full results and the staged ARM identity are in
+`/mnt/d/Codex/TT3/rfnav-006-rmc-speed-fix-20260929/REPORT.md`. This is host
+correctness evidence; no on-device candidate run or live contract-coverage
+measurement occurred.
+
 ### RFNAV-006 GPS application contract carried forward
 
 The following rules are durable enough to bake into RFNAV-006 production design now:

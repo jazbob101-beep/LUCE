@@ -451,6 +451,39 @@ The smallest next step is a separately staged, reversible on-device candidate
 run recording executable hashes and live retained-record/polling behavior before
 UI integration or promotion.
 
+## RFNAV-006 retained-speed motion correction — 2026-09-29
+
+An independent production-code reproduction found that v004 selected the
+validated retained-RMC speed into `g->speed`, yet its shared start/stop
+hysteresis compared legacy `s->speed`. A subsequent VTG could therefore make
+zero-speed RMC enter moving, or moving RMC remain stationary. The isolated
+`/home/jazbob/opentom/lab-work/tomi/nxrfnav-v005-rmc-speed` changes only the
+two threshold comparisons to `g->speed`. The extension-free schema-1 fallback
+also selects legacy speed into that member and retains its behavior. Thresholds,
+continuity and geographic/RFN1 policies are unchanged; v004 and RFNAV-005 are
+preserved.
+
+The new test runs the production provider parser and atomic writer through the
+RFNAV state parser/model. Unchanged v004 fails both disagreeing-speed directions;
+v005 passes 2,154 assertions covering three-update start/stop, intermediate
+speed, duplicate reads/publications and schema-1 fallback. Existing 2,431
+provider-contract and 93 geographic assertions, model/control suites,
+ASan/UBSan, GNU89 and all three immutable historical schema-1 replays pass.
+No RF observations are used in the focused motion test; older replay RFN1 OBS
+remain explicitly synthetic. These host results do not establish live retained
+record coverage, physical RF accuracy or target runtime behavior.
+
+Pinned MacBook Bookworm GCC 3.3.4 output `nxrfnav-v005-rmc-speed` is 249,852
+bytes, SHA-256 `a3319d97aef1111a62d549f2d581a41c388ad0e3c3b8367b786b6bfee71e26fe`,
+with `libnano-X.so` and `libc.so.6` dependencies and only the inherited Nano-X
+`index` shadow warning. The provider candidate remains 29,636 bytes, SHA-256
+`b3fc7302d488a6e3d999c9db58a3eb6c871c01f61b04d1c6c4dfe4cb872a88ed`;
+it was not rebuilt. Neither candidate has been installed on Tomi. RFNAV-005 is
+still the qualified baseline. Evidence and exact source delta:
+`/mnt/d/Codex/TT3/rfnav-006-rmc-speed-fix-20260929/REPORT.md`. Next run the
+provider/v005 pair separately and reversibly on Tomi, recording executable
+identities, retained-record polling and RF/GPS continuity before promotion.
+
 ## Current design conclusions
 
 - **RFNAV-005 remains the current physically qualified RF tracking/control baseline.** RFNAV-006 now has host-tested, ARM-built GPS/OBS core and retained-RMC contract candidates built on that baseline, not a replacement qualification yet.

@@ -417,3 +417,14 @@ and needs `libnano-X.so` plus `libc.so.6`, with the inherited Nano-X `index`
 shadow warning. These are staged outputs only; no Tomi loader/runtime check or
 physical qualification was performed. Build logs and binaries are in
 `/mnt/d/Codex/TT3/rfnav-006-provider-contract-20260929/`.
+
+### Retained-speed RFNAV candidate build — 2026-09-29
+
+The v005 motion-threshold correction was built with the same pinned MacBook
+Bookworm GCC 3.3.4 wrapper. `nxrfnav-v005-rmc-speed` is 249,852 bytes, SHA-256
+`a3319d97aef1111a62d549f2d581a41c388ad0e3c3b8367b786b6bfee71e26fe`;
+ELF32 little-endian ARM, interpreter `/lib/ld-linux.so.2`, direct dependencies
+`libnano-X.so` and `libc.so.6`. The only warning is the historical Nano-X
+`index` shadow declaration. The provider executable is unchanged and neither
+candidate was installed or executed on Tomi. Build evidence is in
+`/mnt/d/Codex/TT3/rfnav-006-rmc-speed-fix-20260929/REPORT.md`.
