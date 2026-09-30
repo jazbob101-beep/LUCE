@@ -405,3 +405,15 @@ The isolated `nxrfnav-v003-rfnav006` GPS/OBS candidate was built with GCC 3.3.4 
 
 Target symbols measure 1408 bytes of GPS state and 3136 bytes of geography state; full ELF text/data/BSS total 250221 bytes including static math. Host compiler stack-frame measurements support a 32 KiB core state/read/parse working-memory budget, but target peak RSS, soft-float cost, event latency and runtime loader behavior were not measured. The candidate has not been installed or executed on Tomi; RFNAV-005's runtime qualification does not transfer automatically.
 
+
+### Retained-RMC isolated candidate build — 2026-09-29
+
+The provider `ttgpsd-rmc-v1` and RFNAV `nxrfnav-v004-rmc-v1` were separately
+built with the same pinned GCC 3.3.4 in `/opt/opentom-bookworm`. Provider is
+29,636 bytes (SHA-256 `b3fc7302d488a6e3d999c9db58a3eb6c871c01f61b04d1c6c4dfe4cb872a88ed`)
+and needs `libc.so.6`; RFNAV is 249,900 bytes (SHA-256
+`f3acb5adf4c6baef9fad41d2bbdb4e2e09aa5897e9fdff83e0dc20a1073e6379`)
+and needs `libnano-X.so` plus `libc.so.6`, with the inherited Nano-X `index`
+shadow warning. These are staged outputs only; no Tomi loader/runtime check or
+physical qualification was performed. Build logs and binaries are in
+`/mnt/d/Codex/TT3/rfnav-006-provider-contract-20260929/`.

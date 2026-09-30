@@ -165,7 +165,41 @@ Publication, sentence, RMC, GGA and GSA freshness is <=2000 ms against target up
 
 The actual C reader/model replays all three hash-bound logs deterministically with synthetic RFN1 observations. V002 reproduces all 72 invalid fixes with stale 2.624 m/s, 22 repeated RMC pairs and 1.05 s maximum valid write/sentence lag. It admits 128/300 synthetic pairs and rejects 122 for GPS state, 40 pending and 10 unmatched. Witness loss yields 50 degraded snapshots; only nine snapshots are established moving across six runs. No real-fixture replay produces a qualified direction; positive legs and stop/resume persistence are covered by synthetic production-code tests. The clean stationary replay never enters moving. This is conservative correctness evidence, not field RF accuracy or proof that the 500 ms live polling cadence has adequate witness coverage.
 
-Source/candidate tests and full policies are owned by [RF Navigator](../architecture/rfnav.md). Private raw logs are now hash-verified at `/mnt/d/Codex/TT3/rfnav-006-core-20260929/private-fixtures/`; report and fixture-verification JSON are in the same work unit. Next measure witness coverage during bounded candidate integration; if needed add explicit successfully-validated-motion provenance, rather than relaxing admission or repeating a GPS-only walk.
+Source/candidate tests and full policies are owned by [RF Navigator](../architecture/rfnav.md). Private raw logs are now hash-verified at `/mnt/d/Codex/TT3/rfnav-006-core-20260929/private-fixtures/`; report and fixture-verification JSON are in the same work unit. The additive retained-RMC candidate below addresses the schema-1 observability gap in source; live candidate coverage still requires bounded target integration.
+
+### Additive retained-RMC provider candidate — 2026-09-29
+
+The earlier schema-1 witness analysis above remains the behavior of the installed,
+unmodified provider and all three preserved historical logs. The isolated
+`/home/jazbob/opentom/lab-work/nxgps-milestone1-rmc-v1` candidate adds ten
+fields to the same schema-1 atomic state snapshot:
+`rmc_contract_version=1`, `rmc_record_id`, `rmc_record_uptime_ms`,
+`rmc_record_valid`, `rmc_record_status`, `rmc_record_provenance`,
+`rmc_record_latitude_deg`, `rmc_record_longitude_deg`,
+`rmc_record_speed_knots`, and `rmc_record_speed_mps`. Legacy fields and
+startup/output paths retain their meanings. The tuple is derived from one
+checksum-valid active RMC with strict packed coordinates, complete finite
+nonnegative speed <=100 m/s, and empty/A/D mode. Valid status is 1 with
+provenance `checksum_validated_rmc`. Status 0 means no record; 2 checksum,
+3 malformed fields, 4 inactive, 5 mode, 6 stream loss, 7 stale, and 8 ID
+exhaustion mark ineligible records with blank tuple/provenance.
+
+The 64-bit ID increments on every identifiable RMC attempt, including bad or
+malformed attempts, and on stream/stale invalidation of a valid record.
+Unrelated GGA/GSA/GSV/PGLOR and repeated publications leave ID, arrival uptime
+and tuple unchanged; VTG can still affect legacy knots but cannot alter the
+retained tuple. Provider PID/start uptime distinguishes restart. Millisecond
+`/proc/uptime` arrival resolution means two distinct IDs at one uptime do not
+prove independent receiver solutions; RFNAV does not count them separately.
+The provider parser/writer and v004 production reader/model passed 2,431
+integration assertions. An ordered 120-update synthetic trajectory with later
+unrelated sentences retained 120 eligible measurements, ignored 120 duplicate
+publications, accepted 114 synthetic OBS and formed 11 northward legs. The
+three historical raw logs remain immutable and continue to exercise the old
+schema-1 fallback only. No live provider deployment, extension coverage, or
+physical RF qualification is inferred. Both isolated candidates have pinned
+GCC 3.3.4 ARM builds; identities and tests are in
+`/mnt/d/Codex/TT3/rfnav-006-provider-contract-20260929/REPORT.md`.
 
 ### RFNAV-006 GPS application contract carried forward
 
@@ -233,7 +267,7 @@ The captured filesystem includes `ephem/ee_meta.txt` with `Expiry=1329067832`, a
 
 ## Known unknowns
 
-Physical receiver make/package and firmware; exact serial wire protocol and baud at the receiver; hash of the Aug. 24 executable and its exact live config; whether the 2018 RTC provider executed; which component selected the old epoch in the 2009 run; why 2009 output was 2007 while the later run produced a current date; exact trigger for the ASIC-dead watchdog; live GPIO/MMIO/reset/power behavior; and which stock application consumed each GPS output remain unresolved. For RFNAV-006 specifically, the initial motion hysteresis/persistence core has host/replay validation and a pinned ARM build; integrated physical qualification and live witness coverage remain outstanding. The deferred repaired-rig moving GPS repeat is complete.
+Physical receiver make/package and firmware; exact serial wire protocol and baud at the receiver; hash of the Aug. 24 executable and its exact live config; whether the 2018 RTC provider executed; which component selected the old epoch in the 2009 run; why 2009 output was 2007 while the later run produced a current date; exact trigger for the ASIC-dead watchdog; live GPIO/MMIO/reset/power behavior; and which stock application consumed each GPS output remain unresolved. For RFNAV-006, the retained-RMC provider and v004 consumer now have host integration and separate pinned ARM builds; installed behavior, integrated physical qualification and live extension/polling coverage remain outstanding. The deferred repaired-rig moving GPS repeat is complete.
 
 ## Canonical references
 
@@ -262,4 +296,3 @@ SHA-256 b9e40735f3aa7813d5900f2abd93bc5811ea2b24e4ed8a23bd4e99c5f84a905f
 The stationary log is a clean bench characterization. The moving log is accepted as partial evidence only because the hand-built TomiDock rig suffered a soldered-wire mechanical failure during the first intentional movement. Exact coordinates are intentionally omitted from LUCE. Raw captures, binaries, and analysis tooling remain evidence; they are not duplicated into this public canonical repository.
 
 Repaired-rig v002 was supplied as `gps-moving-v002.log`, 1,326,625 bytes, SHA-256 `f304318ed45262b300d524e5188974681a54736e5f2b34a1e0031e5888af0430`. The uploaded bytes match the Tomi-side identity recorded in the accompanying terminal transcript. The raw log is preserved in the supplied conversation attachment; the operator transfer workflow stages it in the MacBook `data-share` directory. The implementation pass subsequently retrieved all three logs from the existing MacBook share and verified their canonical hashes into `/mnt/d/Codex/TT3/rfnav-006-core-20260929/private-fixtures/`; private coordinates remain outside public Git. The separate post-return three-packet Tomi-Ping result is operator-supplied terminal evidence; its utility binary hash/source identity remains unbound.
-

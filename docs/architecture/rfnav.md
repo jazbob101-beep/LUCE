@@ -412,9 +412,48 @@ The pinned MacBook Bookworm GCC 3.3.4 build passes with only the historical Nano
 
 Evidence/source snapshot, exact policies, full timelines, patch and source/build identities: `/mnt/d/Codex/TT3/rfnav-006-core-20260929/REPORT.md`. Raw private captures are preserved in that work unit's `private-fixtures/`, outside public Git. Next integrate visible GPS status and Rose/best-area support/age semantics, then qualify the separate candidate on hardware. If measured polling loses too many witnesses, improve explicit provider provenance in a bounded follow-up rather than count unwitnessed RMC timestamps. Production map LOD remains separate.
 
+## RFNAV-006 retained-RMC contract repair candidate — 2026-09-29
+
+The v003 implementation above is preserved and still describes genuine old
+schema-1 state files. Isolated provider
+`/home/jazbob/opentom/lab-work/nxgps-milestone1-rmc-v1` and RFNAV
+`/home/jazbob/opentom/lab-work/tomi/nxrfnav-v004-rmc-v1` add a version-1
+retained RMC extension without changing schema version 1 or geographic scoring
+thresholds. The v004 reader requires the complete, supported extension whenever
+any recognized extension key appears; malformed, partial, unsupported or
+contradictory data fail closed. A valid retained tuple is authoritative even
+when GGA/GSA/GSV/PGLOR replace the raw sentence or VTG changes mixed legacy
+fields. Provider lifetime plus 64-bit record ID and monotonic arrival uptime
+identify new motion; repeated publications, equal-time IDs, invalidity, ID gaps,
+restart, stream loss and stale/future/reversed times do not advance persistence
+or displacement continuity. Truly extension-free schema-1 inputs use the v003
+conservative raw-RMC fallback.
+
+The production provider parser/writer and RFNAV reader/model pass 2,431 focused
+integration assertions; ordered RMC then GGA/GSA/GSV/PGLOR synthetic publication
+preserves 120 witnessed motion updates, ignores 120 duplicate publications and
+forms 11 northward legs from 114 accepted synthetic RFN1 OBS. The existing 93
+geographic assertions, model/control tests, ASan/UBSan, GNU89 and all three
+unchanged historical schema-1 replays pass. The stationary historical replay
+still yields zero directional legs; moving v002 still yields 128/300 accepted
+synthetic OBS and zero legs via fallback. These old captures do not demonstrate
+live extension coverage or field RF accuracy.
+
+MacBook Bookworm GCC 3.3.4 outputs: provider `ttgpsd-rmc-v1`, 29,636 bytes,
+SHA-256 `b3fc7302d488a6e3d999c9db58a3eb6c871c01f61b04d1c6c4dfe4cb872a88ed`,
+`libc.so.6`; RFNAV `nxrfnav-v004-rmc-v1`, 249,900 bytes, SHA-256
+`f3acb5adf4c6baef9fad41d2bbdb4e2e09aa5897e9fdff83e0dc20a1073e6379`,
+`libnano-X.so` and `libc.so.6`. Provider build has no warning; RFNAV has only
+the inherited Nano-X `index` shadow warning. Neither candidate is installed or
+physically qualified. RFNAV-005 remains installed/qualified. Full source,
+regressions and evidence: `/mnt/d/Codex/TT3/rfnav-006-provider-contract-20260929/REPORT.md`.
+The smallest next step is a separately staged, reversible on-device candidate
+run recording executable hashes and live retained-record/polling behavior before
+UI integration or promotion.
+
 ## Current design conclusions
 
-- **RFNAV-005 remains the current physically qualified RF tracking/control baseline.** RFNAV-006 now has a host-tested, ARM-built GPS/OBS core candidate built on that baseline, not a replacement qualification yet.
+- **RFNAV-005 remains the current physically qualified RF tracking/control baseline.** RFNAV-006 now has host-tested, ARM-built GPS/OBS core and retained-RMC contract candidates built on that baseline, not a replacement qualification yet.
 - `nxrfnav-v002` is the current qualified user-facing RFNAV application.
 - RFNAV discovery, paged target selection, live tracking, target changes, close/relaunch, single-instance handling, and UDP/5515 cleanup all work on the physical Tomi/TomiDock system.
 - The RFNAV control plane recovers from a bounded real ECM loss/recovery cycle without permanently dying.
