@@ -396,9 +396,25 @@ At 5 m/px, sparse reduced the sampled point count from 23,383 to 5,138 and was m
 
 The feasibility question is therefore closed positively: **offline regional vector maps are physically viable on Tomi**. The map spike is not itself the RFNAV-006 production UI, and the current 80 m/px feature set is explicitly not production-qualified.
 
+## RFNAV-006 implemented GPS/OBS core candidate — 2026-09-29
+
+The bounded core is implemented in `/home/jazbob/opentom/lab-work/tomi/nxrfnav-v003-rfnav006`, isolated from qualified v002. The candidate event loop reads GPS at most twice per second and feeds its existing RFN1 parser/model into a UI-independent geographic core. Existing screens/control behavior remain; Signal Rose/map rendering is still a subsequent slice. No candidate deployment or physical qualification is claimed, and RFNAV-005 remains the installed qualified baseline.
+
+The strict schema-1 reader uses target uptime and a <=2 s freshness bound. Motion provenance requires a checksum-valid active RMC sentence preserved in `last_sentence_raw`, matching the published position/knots/mps, or an unchanged cached witness at the same RMC timestamp. New unwitnessed motion fails closed. Provider publication or a bare last-RMC timestamp cannot establish a measurement; the [GPS reference](../reference/tomi-gps-glgps.md) owns the source finding and its observability limit. Enter >=0.25 m/s and exit <=0.10 m/s require three distinct eligible witnessed updates. Pending states, invalidity, restart and gaps break displacement continuity. Frozen course and stationary drift do not supply direction.
+
+Only accepted active-target OBS pairs with the newest preceding GPS point within 1500 ms of local receive/dequeue time. Duplicate/rewound RF and reused GPS measurements cannot add support. Source/epoch/target/session changes reset evidence; RF gaps/MISS/staleness and GPS loss break incomplete windows and anchors. RFN1 has no measurement timestamp, so this pairing tolerance does not establish scan-time position or bound network delay.
+
+Provisional policies are fixed and inspectable: 32 GPS points, 32 movement legs and 16 confirmed patches; three-pair median windows over 2–10 s, <=6 dB RSSI range and <=10 m observed radius; two nonoverlapping compatible windows (six observations) to confirm a best patch. Moving legs require 5–30 m over <=20 s, displacement at least twice the summed endpoint extents, a 5 m + 3 m/s elapsed plausibility ceiling, and exclusion within 5 degrees of sector boundaries. Eight north-up sectors report signed signal change/support; warming requires at least three legs, two improvements and mean >=2 dB. Evidence expires after 15 min; active Rose context is local to 250 m. These application choices are not measured GPS accuracy limits or transmitter bearings. No HDOP/satellite gate, RSSI distance, triangulation or persistence was introduced.
+
+Host ASan/UBSan tests pass, including 93 new assertions, actual-provider provenance regressions, 100,000 synthetic updates, and retained RFNAV-005 Tomi/ESP host regressions. All three actual GPS captures replay deterministically through production C with explicitly synthetic RFN1. Stationary v001 admits 234/300 synthetic OBS and no direction; confounded moving v001 admits 63/300; moving v002 admits 128/300, with 72 no-fix, 50 degraded, 40 pending and 10 unmatched rejections. Moving v002 enters moving at samples 83, 91, 100, 266, 284 and 291, but witness loss prevents a qualified directional leg in any real-fixture replay. Synthetic tests establish positive directional/hysteresis behavior; these results do not establish field RF accuracy or 500 ms production witness coverage.
+
+The pinned MacBook Bookworm GCC 3.3.4 build passes with only the historical Nano-X header warning. Candidate `nxrfnav-v003-rfnav006` is **247784 bytes**, SHA-256 `0207cc151cbb2b96ea579abe5b939de83c8cefe87ad77c1f5f3a6952d4fd7c74`; dynamic dependencies remain `libnano-X.so` and `libc.so.6` because the legacy math archive is linked statically. Target GPS/geography state totals 4544 bytes; the core working-memory budget is 32 KiB. Target execution, peak RSS and event latency remain unmeasured.
+
+Evidence/source snapshot, exact policies, full timelines, patch and source/build identities: `/mnt/d/Codex/TT3/rfnav-006-core-20260929/REPORT.md`. Raw private captures are preserved in that work unit's `private-fixtures/`, outside public Git. Next integrate visible GPS status and Rose/best-area support/age semantics, then qualify the separate candidate on hardware. If measured polling loses too many witnesses, improve explicit provider provenance in a bounded follow-up rather than count unwitnessed RMC timestamps. Production map LOD remains separate.
+
 ## Current design conclusions
 
-- **RFNAV-005 remains the current physically qualified RF tracking/control baseline.** RFNAV-006 is the active production-design stage built on that baseline, not a replacement qualification yet.
+- **RFNAV-005 remains the current physically qualified RF tracking/control baseline.** RFNAV-006 now has a host-tested, ARM-built GPS/OBS core candidate built on that baseline, not a replacement qualification yet.
 - `nxrfnav-v002` is the current qualified user-facing RFNAV application.
 - RFNAV discovery, paged target selection, live tracking, target changes, close/relaunch, single-instance handling, and UDP/5515 cleanup all work on the physical Tomi/TomiDock system.
 - The RFNAV control plane recovers from a bounded real ECM loss/recovery cycle without permanently dying.
@@ -433,9 +449,9 @@ Completed:
 - **RFNAV-005:** add desktop product UX, nearby-AP discovery, paged touchscreen target selection, TRACK / Change Target workflow, robust RFC1/RFD1/RFA1 control/reply handling, and physically qualify startup ordering plus bounded ECM recovery.
 - **RFNAV-006 map feasibility spike:** prove that an OSM-derived offline regional vector package and Nano-X renderer are viable on physical Tomi, characterize LOD performance, memory, cell seams, coverage-edge behavior, relaunch stability and RFNAV/TomiDock coexistence.
 
-Active production-design stage:
+Active implementation stage:
 
-- **RFNAV-006:** integrate physically verified Tomi GPS state with RFN1 OBS history, Signal Rose/best-area guidance and the proven regional offline map architecture. The repaired-rig moving v002 completes the deferred GPS characterization. Next implement a bounded GPS/motion model and actual RFN1 OBS geographic-correlation replay harness using the existing RFNAV-005 source. Preserve signal tracking when GPS is absent. Production map LOD and integrated Signal Rose/best-area UI follow this tested core; v002 is not full RFNAV-006 qualification.
+- **RFNAV-006:** integrate physically verified Tomi GPS state with RFN1 OBS history, Signal Rose/best-area guidance and the proven regional offline map architecture. The repaired-rig moving v002 completes the deferred GPS characterization. The bounded GPS/motion model and actual RFN1 OBS geographic-correlation replay harness are implemented and ARM-built as the isolated candidate documented above. Preserve signal tracking when GPS is absent. Production map LOD and integrated Signal Rose/best-area UI follow this tested core; v002 is not full RFNAV-006 qualification.
 
 Later work may add geographic-session persistence, associated-uplink edge-case qualification, and BLE discovery/tracking. Those are not RFNAV-005 or current RFNAV-006 feasibility claims.
 

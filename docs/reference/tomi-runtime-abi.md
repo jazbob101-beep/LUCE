@@ -399,3 +399,9 @@ Supplemental live reboot-path evidence was captured directly from Tomi on 2026-0
 
 Historical compatibility evidence: `/mnt/d/Codex/usbmode-authoritative-state-v004-blackbox-compat-20260903/COMMAND_COMPATIBILITY.md` and `EXACT_RUNTIME.json` describe an exact BusyBox extracted from a hash-verified V003 image, exercised under ARM emulation. Those results are image-scoped and do not replace the current live observations.
 
+## RFNAV-006 core candidate ABI — 2026-09-29
+
+The isolated `nxrfnav-v003-rfnav006` GPS/OBS candidate was built with GCC 3.3.4 in the MacBook `/opt/opentom-bookworm` chroot using the historical kernel/Nano-X headers and libraries. It is ELF32 little-endian ARM, interpreter `/lib/ld-linux.so.2`, with a GLIBC_2.0 symbol-version requirement. The legacy math archive is linked statically; direct dynamic dependencies remain `libnano-X.so` and `libc.so.6`. The only build warning is the known historical Nano-X `index` shadow warning. Build identity and qualification status are owned by [RF Navigator](../architecture/rfnav.md).
+
+Target symbols measure 1408 bytes of GPS state and 3136 bytes of geography state; full ELF text/data/BSS total 250221 bytes including static math. Host compiler stack-frame measurements support a 32 KiB core state/read/parse working-memory budget, but target peak RSS, soft-float cost, event latency and runtime loader behavior were not measured. The candidate has not been installed or executed on Tomi; RFNAV-005's runtime qualification does not transfer automatically.
+
